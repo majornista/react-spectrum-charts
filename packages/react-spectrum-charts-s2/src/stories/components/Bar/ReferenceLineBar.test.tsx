@@ -11,8 +11,35 @@
  */
 import React from 'react';
 
+import { fireEvent } from '@testing-library/react';
+
 import { findAllMarksByGroupName, findChart, findMarksByGroupName, render } from '../../../test-utils';
-import { Basic, Label } from './ReferenceLineBar.story';
+import { AccessibleNavigation, Basic, Label } from './ReferenceLineBar.story';
+
+describe('AccessibleNavigation', () => {
+  test('keyboard navigation drills into a bar and moves the focus ring', async () => {
+    render(<AccessibleNavigation {...AccessibleNavigation.args} />);
+    const chart = await findChart();
+    const container = chart.closest('.rsc-container') as HTMLElement;
+
+    const entryButton = container.querySelector('button') as HTMLButtonElement;
+    expect(entryButton).toBeTruthy();
+    entryButton.click();
+
+    const dnNode = () => container.querySelector('.dn-node') as HTMLElement;
+    expect(dnNode()).toBeTruthy();
+
+    // single-series bar: drilling once from the chart root lands on the first bar (leaf)
+    fireEvent.keyDown(dnNode(), { key: 'Enter', code: 'Enter' });
+    const barRings = await findAllMarksByGroupName(chart, 'bar0_focusRing');
+    expect(barRings.some((ring) => ring.getAttribute('opacity') === '1')).toBe(true);
+
+    // arrow key moves focus to a sibling bar
+    const focusedIdBefore = dnNode().id;
+    fireEvent.keyDown(dnNode(), { key: 'ArrowRight', code: 'ArrowRight' });
+    expect(dnNode().id).not.toBe(focusedIdBefore);
+  });
+});
 
 describe('ReferenceLineBar', () => {
   test('Reference line renders', async () => {

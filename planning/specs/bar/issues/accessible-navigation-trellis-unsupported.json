@@ -1,0 +1,84 @@
+{
+  "id": "accessible-navigation-trellis-unsupported",
+  "title": "Accessible navigation is incorrect for trellised bar charts",
+  "chartType": "bar",
+  "kind": "bug",
+  "variant": "s2",
+  "status": "approved",
+  "lastUpdated": "2026-09-14",
+  "complexity": {
+    "score": 5,
+    "rationale": "No existing precedent for faceted keyboard navigation: needs a new nested-facet structure graph, per-facet focus-ring geometry, and per-facet popover/inspect anchoring, each requiring its own design decision rather than repeating an existing pattern."
+  },
+  "summary": "Enabling accessibleNavigation on a trellised Bar produces incorrect keyboard navigation — panels are merged, node ids collide, group labels/counts are wrong, and the focus ring/popover anchor to the wrong position — because the data-navigator structure and focus geometry have no notion of the trellis facet.",
+  "symptom": "With accessibleNavigation on a Bar that has a `trellis` prop, keyboard navigation treats every trellis panel as one chart: bars from different panels that share a dimension value are merged into a single navigable group, stack counts and aria labels are wrong, and the focus ring / popover land on the wrong bar because positions are read from the shared band scale instead of the facet's repeated scale.",
+  "rootCause": "The navigator is only ever told about dimension/color/metric/orientation. In RscChart.tsx the <Navigator> dispatch forwards those fields but never the Bar's `trellis`/`trellisOrientation`. NavMarkFields (navigableMarks.ts) now includes a `trellis` field (added to gate dual-metric-axis labeling), but it is not threaded through the nav chain (Navigator -> dataNavigatorAdapter -> buildChartStructure -> buildBarStructure). As a result buildBarStructure groups all rows by dimension alone via groupIntoStacks: rows from different facet panels collapse into one Stack, and segmentId(dimensionValue, colorValue) repeats across panels, so segment node ids collide and stack aria labels (buildNodeLabel) report merged counts/totals. Separately, focus geometry (focusedItemGeometry.ts, getBarScaledPoint) reads the top-level 'xBand'/'yBand' and metric scales via view.scale(); in a trellis plot the per-panel dimension/metric scale is a repeated scale inside the trellis group mark (getRepeatedScale / getTrellisGroupMark in barSpecBuilder.ts and trellisedBarUtils.ts), not the top-level scale, so the focus ring and popover anchor resolve to the wrong facet position.",
+  "comparison": [
+    {
+      "aspect": "Grouping of bars into navigable units",
+      "expected": "Each trellis panel is its own group of stacks/bars; a dimension value in panel A is distinct from the same dimension value in panel B.",
+      "actual": "All panels are flattened; rows sharing a dimension value are merged into a single Stack regardless of which panel they belong to."
+    },
+    {
+      "aspect": "Node ids",
+      "expected": "Every navigable bar/segment has a unique id, namespaced by its facet.",
+      "actual": "segmentId(dimension, color) collides across panels, so different bars share the same node id."
+    },
+    {
+      "aspect": "Focus ring / popover position",
+      "expected": "The focus ring and popover anchor to the focused bar inside its own panel, using that panel's repeated scale.",
+      "actual": "Positions are read from the top-level xBand/yBand scale, so they resolve to the wrong (or a nonexistent) location for faceted data."
+    }
+  ],
+  "crossCutting": {
+    "touchesHoverAnimation": false,
+    "touchesControlledHighlight": false,
+    "touchesLegendInteraction": false,
+    "touchesTooltipOrPopover": true,
+    "requiresNewSignalOrScale": false,
+    "requiresS1S2Parity": false,
+    "notes": "touchesTooltipOrPopover: the keyboard-focus popover/inspect anchor comes from getFocusedItemBounds/getFocusedItemClientPosition (focusedItemGeometry.ts), which must resolve per-facet positions for a trellis bar, so fixing navigation also affects where the focused-item popover/tooltip appears. requiresS1S2Parity: false — accessibleNavigation/dataNavigator exists only in the s2 packages (no vega-spec-builder / react-spectrum-charts equivalent), so there is no s1 sibling to mirror."
+  },
+  "implementationPlan": [
+    {
+      "file": "packages/react-spectrum-charts-s2/src/dataNavigator/navigableMarks.ts",
+      "change": "Bug location (input surface): NavMarkFields has `trellis` (added for dual-axis gating) but no `trellisOrientation`. Add `trellisOrientation` so the mark's faceting is fully available to the navigator."
+    },
+    {
+      "file": "packages/react-spectrum-charts-s2/src/RscChart.tsx",
+      "change": "Bug location (the <Navigator> dispatch): forward the Bar's trellis/trellisOrientation (and the trellis field's display title) to <Navigator> alongside dimension/color/metric/orientation."
+    },
+    {
+      "file": "packages/react-spectrum-charts-s2/src/dataNavigator/buildBarStructure.ts",
+      "change": "Bug location (groupIntoStacks/segmentId/buildBarStructure): teach the structure builder about facets — nest each trellis panel as its own dimension level (root -> panel -> stack/group -> segment) so grouping, node ids, and aria labels are per-panel rather than merged. groupIntoStacks and segmentId need a facet key to keep ids unique."
+    },
+    {
+      "file": "packages/react-spectrum-charts-s2/src/dataNavigator/buildChartStructure.ts",
+      "change": "Threading: carry the new trellis/trellisOrientation options from the adapter into buildBarStructure, mirroring how dimension/color/metric flow today."
+    },
+    {
+      "file": "packages/react-spectrum-charts-s2/src/dataNavigator/dataNavigatorAdapter.ts",
+      "change": "Threading: add trellis/trellisOrientation to AttachDataNavigatorOptions and pass them to buildChartStructure."
+    },
+    {
+      "file": "packages/react-spectrum-charts-s2/src/dataNavigator/Navigator.tsx",
+      "change": "Threading: add trellis/trellisOrientation to NavigatorProps and forward to attachDataNavigator (including the effect dep array)."
+    },
+    {
+      "file": "packages/react-spectrum-charts-s2/src/dataNavigator/focusedItemGeometry.ts",
+      "change": "Bug location (getBarScaledPoint): reads the top-level xBand/yBand + metric scales; for a trellis bar it must resolve the panel's repeated scale and the panel's group offset instead. Reference the repeated-scale construction in trellisedBarUtils.ts / barSpecBuilder.ts (getRepeatedScale, getTrellisGroupMark)."
+    },
+    {
+      "file": "packages/vega-spec-builder-s2/src/bar/trellisedBarUtils.ts",
+      "change": "Reference: source of truth for how facets and their repeated scales are laid out; the geometry/structure fixes must match this layout. May also need to expose or name per-facet scales so the focus geometry can look them up."
+    },
+    {
+      "file": "packages/react-spectrum-charts-s2/src/dataNavigator/buildBarStructure.test.ts",
+      "change": "Reference/verification: add coverage for a trellised data set asserting per-panel grouping, unique node ids, and correct per-panel counts once the fix lands."
+    }
+  ],
+  "openQuestions": [
+    "What is the desired keyboard model for facets — should Escape from a panel's first group step out to a panel level and then to the chart root, and should arrow keys wrap within a panel or cross into the adjacent panel?",
+    "Can the per-facet dimension/metric scales be resolved through the public Vega View API (view.scale within the facet's group context), or does the spec builder need to emit uniquely-named per-panel scales for the geometry helper to read?"
+  ]
+}

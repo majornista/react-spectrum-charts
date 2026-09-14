@@ -1,0 +1,50 @@
+{
+  "id": "accessible-navigation-dual-axis-series-order",
+  "title": "Dual-metric-axis accessible labels derive the secondary series from raw data order, not the color-scale domain",
+  "chartType": "bar",
+  "kind": "bug",
+  "variant": "s2",
+  "status": "approved",
+  "lastUpdated": "2026-09-14",
+  "complexity": {
+    "score": 3,
+    "rationale": "The correct source (the live color-scale domain) isn't available where the nav structure is built, so a robust fix needs either a shared spec-builder helper or reading the resolved domain from the Vega view — a design decision, though the code change itself is small."
+  },
+  "summary": "For a dual-metric-axis bar with accessibleNavigation, the per-series metric axis title is chosen by treating the last distinct color value in raw data order as the secondary-axis series. The spec builder instead assigns the secondary axis to peek(domain(COLOR_SCALE)). These match for a default ordinal color scale but diverge under a custom color-scale sort/explicit domain or a hidden series, causing a leaf to announce the wrong metric axis.",
+  "symptom": "With accessibleNavigation on a dual-metric-axis bar whose color scale is sorted/filtered (or has a hidden series), a focused bar can announce the wrong metric axis title (e.g. a bar plotted against the primary axis is read with the secondary axis's title, or vice versa).",
+  "rootCause": "navMetricTitleBySeries in packages/react-spectrum-charts-s2/src/RscChart.tsx computes the secondary-axis series as the last element of the distinct color values in raw `data` first-appearance order. The spec builder's source of truth is the LAST_RSC_SERIES_ID signal, updated to peek(domain(COLOR_SCALE)) — the last element of the resolved color-scale domain (packages/vega-spec-builder-s2/src/signal/signalSpecBuilder.ts, getLastRscSeriesIdSignal), which addDualMetricAxisData uses to split rows onto the primary vs secondary axis (packages/vega-spec-builder-s2/src/bar/barSpecBuilder.ts, addDualMetricAxisData). Raw data order and the color-scale domain order are different sources: they coincide only for a default ordinal domain with no sort and no hidden series. The nav structure is built once at attach time (packages/react-spectrum-charts-s2/src/dataNavigator/dataNavigatorAdapter.ts) before the Vega view is guaranteed to exist, so RscChart cannot currently read the resolved domain and replicates the ordering from the raw data prop instead.",
+  "comparison": [
+    {
+      "aspect": "Which series is the secondary-axis series",
+      "expected": "peek(domain(COLOR_SCALE)) — the last series in the resolved color-scale domain (respects sort/explicit domain and excludes hidden series).",
+      "actual": "The last distinct color value in raw data first-appearance order, ignoring any color-scale sort/domain and still including hidden series."
+    }
+  ],
+  "crossCutting": {
+    "touchesHoverAnimation": false,
+    "touchesControlledHighlight": false,
+    "touchesLegendInteraction": false,
+    "touchesTooltipOrPopover": false,
+    "requiresNewSignalOrScale": false,
+    "requiresS1S2Parity": false,
+    "notes": "requiresS1S2Parity: false — accessibleNavigation/dataNavigator exists only in the s2 packages. A robust fix may need to read the resolved color-scale domain from the live Vega view (or a shared helper exported from vega-spec-builder-s2) rather than recomputing series order in the React layer."
+  },
+  "implementationPlan": [
+    {
+      "file": "packages/react-spectrum-charts-s2/src/RscChart.tsx",
+      "change": "Bug location (navMetricTitleBySeries): picks the secondary series from raw data order. Fix direction: derive it from the resolved color-scale domain instead — e.g. read domain(COLOR_SCALE) from the live Vega view once available (and rebuild/refresh labels), or at minimum exclude hiddenSeries and honor any color sort so it matches the spec builder."
+    },
+    {
+      "file": "packages/vega-spec-builder-s2/src/signal/signalSpecBuilder.ts",
+      "change": "Reference (getLastRscSeriesIdSignal): defines the secondary-series source of truth (peek(domain(COLOR_SCALE))) the nav must match."
+    },
+    {
+      "file": "packages/vega-spec-builder-s2/src/bar/barSpecBuilder.ts",
+      "change": "Reference (addDualMetricAxisData): splits rows onto primary/secondary axes by SERIES_ID vs LAST_RSC_SERIES_ID — confirms which series belongs to which axis."
+    }
+  ],
+  "openQuestions": [
+    "Is reading the resolved domain from the live Vega view feasible without rebuilding the nav structure (which is intentionally built once to preserve focus), or should vega-spec-builder-s2 expose a shared series-ordering helper the React layer can call synchronously?",
+    "Beyond a custom color sort, does hidden-series filtering already reproduce this divergence with existing props, making it more than theoretical?"
+  ]
+}

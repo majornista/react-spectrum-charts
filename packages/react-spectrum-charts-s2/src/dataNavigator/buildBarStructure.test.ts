@@ -362,6 +362,63 @@ describe('buildNodeLabel()', () => {
     const node = { id: 'Chrome', data: { browser: 'Chrome' } } as unknown as NodeObject;
     expect(buildNodeLabel(node, 'en-US', { value: 'Downloads' })).toContain('browser: Chrome');
   });
+
+  // The colorOverride field's label should read a human color name ("Color: dark green"), not the raw hex.
+  test('names the colorOverride field with a human color name instead of its raw value', () => {
+    const node = { id: 'IG Stories', data: { channel: 'IG Stories', barColor: '#2d7d46' } } as unknown as NodeObject;
+    const label = buildNodeLabel(node, 'en-US', {}, 'barColor');
+    expect(label).toContain('Color: dark green');
+    expect(label).not.toContain('#2d7d46');
+    expect(label).not.toContain('barColor:');
+  });
+
+  test('uses a provided display label for the colorOverride field when present', () => {
+    const node = { id: 'FB Post', data: { channel: 'FB Post', barColor: '#d7373f' } } as unknown as NodeObject;
+    const label = buildNodeLabel(node, 'en-US', { barColor: 'Trend' }, 'barColor');
+    expect(label).toContain('Trend: vibrant red');
+  });
+
+  test('falls back to the raw colorOverride value when it is not a parseable color', () => {
+    const node = { id: 'FB Post', data: { channel: 'FB Post', barColor: 'not-a-color' } } as unknown as NodeObject;
+    const label = buildNodeLabel(node, 'en-US', {}, 'barColor');
+    expect(label).toContain('Color: not-a-color');
+  });
+
+  // The `order` field is a sort control with no user-facing meaning, so it's omitted from the label.
+  test('omits the order field from the leaf label', () => {
+    const node = { id: 'Chrome', data: { browser: 'Chrome', value: 27000, order: 0 } } as unknown as NodeObject;
+    const label = buildNodeLabel(node, 'en-US', {}, undefined, 'order');
+    expect(label).toContain('browser: Chrome');
+    expect(label).toContain('value: 27000');
+    expect(label).not.toContain('order');
+  });
+
+  // On a dual-metric-axis bar, the metric field reads the axis title of the datum's own series.
+  test('labels the metric field with the per-series axis title when one is provided', () => {
+    const metricSeriesLabel = {
+      metric: 'value',
+      color: 'operatingSystem',
+      titleBySeries: { Windows: 'Windows Downloads', Mac: 'Mac Downloads' },
+    };
+    const windows = { id: 'a', data: { operatingSystem: 'Windows', value: 5 } } as unknown as NodeObject;
+    const mac = { id: 'b', data: { operatingSystem: 'Mac', value: 3 } } as unknown as NodeObject;
+    expect(buildNodeLabel(windows, 'en-US', {}, undefined, undefined, metricSeriesLabel)).toContain(
+      'Windows Downloads: 5'
+    );
+    expect(buildNodeLabel(mac, 'en-US', {}, undefined, undefined, metricSeriesLabel)).toContain('Mac Downloads: 3');
+  });
+
+  // A series missing from the map falls back to the flat field label, then the raw field name.
+  test('falls back to the flat field label for a series not in the per-series map', () => {
+    const metricSeriesLabel = {
+      metric: 'value',
+      color: 'operatingSystem',
+      titleBySeries: { Windows: 'Windows Downloads' },
+    };
+    const other = { id: 'c', data: { operatingSystem: 'Other', value: 2 } } as unknown as NodeObject;
+    const label = buildNodeLabel(other, 'en-US', { value: 'Downloads' }, undefined, undefined, metricSeriesLabel);
+    expect(label).toContain('Downloads: 2');
+  });
 });
 
 describe('getBarNodeId()', () => {

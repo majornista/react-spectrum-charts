@@ -105,6 +105,10 @@ Set `diverging` on `Bar` for a metric that spans positive and negative values (e
 
 Set `accessibleNavigation` on `Chart` to enable keyboard navigation and focus rings for this bar's items. See [Accessible keyboard navigation](/docs/spectrum2/overview#accessible-keyboard-navigation) for supported interactions.
 
+:::note
+Keyboard navigation does not yet support trellised bar charts (bars with a `trellis` facet); enabling `accessibleNavigation` on one produces incorrect navigation (panels are merged and focus is mis-placed), so avoid combining them until this is fixed.
+:::
+
 ---
 
 ## Bar props (S2)

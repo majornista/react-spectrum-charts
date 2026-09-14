@@ -144,4 +144,37 @@ WithThreeSeries.args = {
   color: 'operatingSystem',
 };
 
-export { Basic, WithSublabels, WithThreeSeries };
+const AccessibleNavigationStory: StoryFn<typeof Bar> = (args): ReactElement => {
+  const chartProps = useChartProps({ data: barDataTwoSeries, width: 800, height: 600, accessibleNavigation: true });
+  return (
+    <Chart {...chartProps}>
+      <Axis position={args.orientation === 'horizontal' ? 'left' : 'bottom'} baseline title="Browser" />
+      <Axis
+        position={args.orientation === 'horizontal' ? 'bottom' : 'left'}
+        ticks
+        tickMinStep={1}
+        title="Windows Downloads"
+      />
+      <Axis
+        position={args.orientation === 'horizontal' ? 'bottom' : 'right'}
+        ticks
+        tickMinStep={1}
+        title="Mac Downloads"
+      />
+      <Bar {...args}>
+        <ChartInspect>{dialogContent}</ChartInspect>
+        <ChartPopover width={200}>{dialogContent}</ChartPopover>
+      </Bar>
+      <Legend title="Operating system" highlight />
+    </Chart>
+  );
+};
+
+const AccessibleNavigation = bindWithProps(AccessibleNavigationStory);
+AccessibleNavigation.args = {
+  ...defaultProps,
+  order: 'order',
+  color: 'operatingSystem',
+};
+
+export { AccessibleNavigation, Basic, WithSublabels, WithThreeSeries };

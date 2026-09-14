@@ -196,9 +196,20 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
     [sanitizedChildren]
   );
   const isHorizontalNav = navGeometryFields.orientation === 'horizontal';
+  // Metric-side axes in declaration order; the spec builder assigns dual-axis primary/secondary by that order, not by side.
+  const navMetricAxisChildren = useMemo(() => {
+    const positions = isHorizontalNav ? ['bottom', 'top'] : ['left', 'right'];
+    return sanitizedChildren.filter(
+      (child) =>
+        'displayName' in child.type &&
+        child.type.displayName === 'Axis' &&
+        positions.includes((child.props as { position?: string }).position ?? '')
+    );
+  }, [sanitizedChildren, isHorizontalNav]);
+  // Primary (first, declaration-order) metric axis title — used for the stack/group total and as the shared fallback.
   const navMetricAxisTitle = useMemo(
-    () => findAxisTitle(isHorizontalNav ? ['bottom', 'top'] : ['left', 'right']),
-    [findAxisTitle, isHorizontalNav]
+    () => (navMetricAxisChildren[0]?.props as { title?: string } | undefined)?.title,
+    [navMetricAxisChildren]
   );
   const navDimensionAxisTitle = useMemo(
     () => findAxisTitle(isHorizontalNav ? ['left', 'right'] : ['bottom', 'top']),
@@ -220,6 +231,24 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
     if (navColorTitle && navColor) labels[navColor] = navColorTitle;
     return labels;
   }, [navDimensionAxisTitle, navMetricAxisTitle, navColorTitle, navColor, navDimensionField, navMetricField]);
+  // Per-series metric titles for a real dual-metric-axis bar (mirrors isDualMetricAxis); its last series maps to the secondary axis.
+  const navMetricTitleBySeries = useMemo(() => {
+    if (!navFields?.dualMetricAxis || !navColor) return undefined;
+    if (navGeometryFields.type !== 'dodged' || navFields?.trellis) return undefined;
+    const primaryTitle = (navMetricAxisChildren[0]?.props as { title?: string } | undefined)?.title;
+    const secondaryTitle = (navMetricAxisChildren[1]?.props as { title?: string } | undefined)?.title;
+    if (!primaryTitle && !secondaryTitle) return undefined;
+    // Approximates the color-scale domain order; diverges under a custom sort/hidden series (see bar/issues spec).
+    const seriesOrder = [...new Set((data as SimpleData[]).map((datum) => String(datum[navColor])))];
+    if (seriesOrder.length === 0) return undefined;
+    const secondarySeries = seriesOrder[seriesOrder.length - 1];
+    const labels: Record<string, string> = {};
+    for (const series of seriesOrder) {
+      const title = series === secondarySeries ? secondaryTitle : primaryTitle;
+      if (title) labels[series] = title;
+    }
+    return Object.keys(labels).length ? labels : undefined;
+  }, [navFields?.dualMetricAxis, navFields?.trellis, navColor, navGeometryFields.type, navMetricAxisChildren, data]);
 
   const getView = useCallback(() => chartView.current ?? undefined, [chartView]);
   const getPopoverClosedAt = useCallback(() => popoverClosedAt.current, [popoverClosedAt]);
@@ -333,12 +362,15 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             data={data as SimpleData[]}
             dimension={navFields?.dimension}
             color={navColor}
+            colorOverride={navFields?.colorOverride}
+            order={navFields?.order}
             metric={navFields?.metric}
             metricLabel={navMetricAxisTitle}
             orientation={navGeometryFields.orientation}
             isTimeDimension={navIsTimeDimension}
             title={title}
             fieldLabels={navFieldLabels}
+            metricTitleBySeries={navMetricTitleBySeries}
             containerRef={navContainerRef}
             chartId={chartId}
             getView={getView}

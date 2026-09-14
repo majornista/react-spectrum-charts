@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 import dataNavigator, { Edges, NavigationRules, NodeObject, Nodes, Structure, StructureOptions } from 'data-navigator';
+import { parseColor } from 'react-stately';
 
 import { DEFAULT_BAR_ORIENTATION, DEFAULT_CATEGORICAL_DIMENSION, DEFAULT_METRIC } from '@spectrum-charts/constants';
 import { Orientation, SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
@@ -26,6 +27,10 @@ export interface BuildBarStructureOptions {
   dimension?: string;
   /** The series/color field. When set, the bar is multi-series (each column holds multiple segments). */
   color?: string;
+  /** A per-datum color-override field (the bar's `colorOverride` prop) whose values are raw color strings; its accessible label reads a human color name instead of the hex/rgb value. */
+  colorOverride?: string;
+  /** The bar's sort-order field (the `order` prop). It's a stack/dodge sort control with no user-facing meaning, so it's omitted from the accessible label. */
+  order?: string;
   /** The metric/value field. When set on a stacked bar, each stack's label includes the summed total across its segments. */
   metric?: string;
   /** Display label for the metric total (e.g. the metric axis's title, like "Downloads"). Falls back to the raw metric field name when not given. */
@@ -38,6 +43,18 @@ export interface BuildBarStructureOptions {
   locale?: string;
   /** Maps a data field name to its display label (axis/legend title), so labels read as the chart's titles rather than raw field keys. */
   fieldLabels?: Record<string, string>;
+  /** For a dual-metric-axis bar, maps each series (color) value to its own metric axis title, so a leaf reads the axis its series is plotted against (e.g. "Mac Downloads" for the Mac series). */
+  metricTitleBySeries?: Record<string, string>;
+}
+
+/** For a dual-metric-axis bar, the per-series metric axis titles plus the fields needed to apply them to a leaf datum. */
+interface MetricSeriesLabel {
+  /** The metric/value field being labeled. */
+  metric: string;
+  /** The series/color field read from the datum to pick the series' axis title. */
+  color: string;
+  /** Series value → its metric axis title. */
+  titleBySeries: Record<string, string>;
 }
 
 /** Internal-only stack-node data fields carrying the summed metric total, read back by buildNodeLabel. */
@@ -146,7 +163,10 @@ const buildStackedBarStructure = (
   orientation: Orientation,
   title: string | undefined,
   locale: string,
-  fieldLabels: Record<string, string>
+  fieldLabels: Record<string, string>,
+  colorOverride: string | undefined,
+  order: string | undefined,
+  metricSeriesLabel: MetricSeriesLabel | undefined
 ): BarStructure => {
   const stacks = groupIntoStacks(data, dimension, color);
 
@@ -229,7 +249,9 @@ const buildStackedBarStructure = (
 
   const structure: Structure = { nodes, edges, navigationRules: getStackedBarNavigationRules(orientation) };
 
-  applyDefaultLabels(structure, (node) => buildNodeLabel(node, locale, fieldLabels));
+  applyDefaultLabels(structure, (node) =>
+    buildNodeLabel(node, locale, fieldLabels, colorOverride, order, metricSeriesLabel)
+  );
 
   return { structure, entryPoint: CHART_ROOT_ID };
 };
@@ -238,15 +260,35 @@ export const buildBarStructure = ({
   data,
   dimension = DEFAULT_CATEGORICAL_DIMENSION,
   color,
+  colorOverride,
+  order,
   metric = DEFAULT_METRIC,
   metricLabel,
   orientation = DEFAULT_BAR_ORIENTATION,
   title,
   locale = DEFAULT_DATA_NAVIGATOR_LOCALE,
   fieldLabels = {},
+  metricTitleBySeries,
 }: BuildBarStructureOptions): BarStructure => {
+  // Per-series metric titles only apply to a multi-series (color) bar — i.e. a dual-metric-axis bar.
+  const metricSeriesLabel: MetricSeriesLabel | undefined =
+    metricTitleBySeries && color ? { metric, color, titleBySeries: metricTitleBySeries } : undefined;
+
   if (color !== undefined) {
-    return buildStackedBarStructure(data, dimension, color, metric, metricLabel, orientation, title, locale, fieldLabels);
+    return buildStackedBarStructure(
+      data,
+      dimension,
+      color,
+      metric,
+      metricLabel,
+      orientation,
+      title,
+      locale,
+      fieldLabels,
+      colorOverride,
+      order,
+      metricSeriesLabel
+    );
   }
 
   const structureOptions: StructureOptions = {
@@ -282,7 +324,9 @@ export const buildBarStructure = ({
     }
   }
 
-  applyDefaultLabels(structure, (node) => buildNodeLabel(node, locale, fieldLabels));
+  applyDefaultLabels(structure, (node) =>
+    buildNodeLabel(node, locale, fieldLabels, colorOverride, order, metricSeriesLabel)
+  );
 
   return { structure, entryPoint };
 };
@@ -326,10 +370,22 @@ export const buildChartDescription = (
   });
 };
 
+/** Converts a raw color string (hex/rgb/hsl) into a localized human color name (e.g. "vibrant red"), falling back to the raw value when it isn't parseable. */
+const getAccessibleColorName = (value: unknown, locale: string): string => {
+  try {
+    return parseColor(String(value)).getColorName(locale);
+  } catch {
+    return String(value);
+  }
+};
+
 export const buildNodeLabel = (
   node: NodeObject,
   locale: string = DEFAULT_DATA_NAVIGATOR_LOCALE,
-  fieldLabels: Record<string, string> = {}
+  fieldLabels: Record<string, string> = {},
+  colorOverride?: string,
+  order?: string,
+  metricSeriesLabel?: MetricSeriesLabel
 ): string => {
   const data = node.data as Record<string, unknown> | undefined;
   if (!data) return String(node.id);
@@ -357,7 +413,24 @@ export const buildNodeLabel = (
   }
 
   const parts = Object.entries(data)
-    .filter(([key, value]) => !key.startsWith('_') && value != null && typeof value !== 'object' && typeof value !== 'function')
-    .map(([key, value]) => `${fieldLabels[key] ?? key}: ${value}`);
+    .filter(
+      ([key, value]) =>
+        !key.startsWith('_') &&
+        key !== order &&
+        value != null &&
+        typeof value !== 'object' &&
+        typeof value !== 'function'
+    )
+    .map(([key, value]) => {
+      if (key === colorOverride) {
+        return `${fieldLabels[key] ?? 'Color'}: ${getAccessibleColorName(value, locale)}`;
+      }
+      // A dual-metric-axis leaf reads the title of the axis its own series is plotted against.
+      if (metricSeriesLabel && key === metricSeriesLabel.metric) {
+        const seriesTitle = metricSeriesLabel.titleBySeries[String(data[metricSeriesLabel.color])];
+        if (seriesTitle) return `${seriesTitle}: ${value}`;
+      }
+      return `${fieldLabels[key] ?? key}: ${value}`;
+    });
   return parts.length > 0 ? `${parts.join('. ')}.` : String(node.id);
 };

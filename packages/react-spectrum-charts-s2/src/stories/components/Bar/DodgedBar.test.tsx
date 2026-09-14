@@ -9,6 +9,8 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
+import { fireEvent } from '@testing-library/react';
+
 import { DIMENSION_HOVER_AREA, FADE_FACTOR } from '@spectrum-charts/constants';
 
 import {
@@ -22,7 +24,51 @@ import {
   waitForMarksByGroupName,
   within,
 } from '../../../test-utils';
-import { InspectOnDimensionArea } from './DodgedBar.story';
+import { AccessibleNavigation, InspectOnDimensionArea } from './DodgedBar.story';
+
+describe('AccessibleNavigation', () => {
+  test('keyboard navigation drills from group to segment and moves the focus ring', async () => {
+    render(<AccessibleNavigation {...AccessibleNavigation.args} />);
+    const chart = await findChart();
+    const container = chart.closest('.rsc-container') as HTMLElement;
+
+    const entryButton = container.querySelector('button') as HTMLButtonElement;
+    expect(entryButton).toBeTruthy();
+    entryButton.click();
+
+    const dnNode = () => container.querySelector('.dn-node') as HTMLElement;
+    expect(dnNode()).toBeTruthy();
+
+    // drill root -> group (dimension level) -> first bar within the group (leaf)
+    fireEvent.keyDown(dnNode(), { key: 'Enter', code: 'Enter' });
+    fireEvent.keyDown(dnNode(), { key: 'Enter', code: 'Enter' });
+    const segmentRings = await findAllMarksByGroupName(chart, 'bar0_focusRing');
+    expect(segmentRings.some((ring) => ring.getAttribute('opacity') === '1')).toBe(true);
+
+    // arrow key moves focus to a sibling node
+    const focusedIdBefore = dnNode().id;
+    fireEvent.keyDown(dnNode(), { key: 'ArrowRight', code: 'ArrowRight' });
+    expect(dnNode().id).not.toBe(focusedIdBefore);
+  });
+
+  // The data rows carry an `order` sort-control field; it should be left out of the leaf's label.
+  test("the focused bar's accessible label omits the order sort field", async () => {
+    render(<AccessibleNavigation {...AccessibleNavigation.args} />);
+    const chart = await findChart();
+    const container = chart.closest('.rsc-container') as HTMLElement;
+
+    const entryButton = container.querySelector('button') as HTMLButtonElement;
+    entryButton.click();
+    const dnNode = () => container.querySelector('.dn-node') as HTMLElement;
+
+    fireEvent.keyDown(dnNode(), { key: 'Enter', code: 'Enter' }); // root -> group
+    fireEvent.keyDown(dnNode(), { key: 'Enter', code: 'Enter' }); // group -> leaf
+    // data-navigator sets aria-label on a nested `.dn-node-text` child, not on `.dn-node` itself.
+    const label = dnNode().querySelector('.dn-node-text')?.getAttribute('aria-label') ?? '';
+    expect(label).toContain('Browser:');
+    expect(label).not.toContain('order');
+  });
+});
 
 describe('InspectOnDimensionArea', () => {
   test('hovering dimension area should apply highlight styling and show tooltip', async () => {
