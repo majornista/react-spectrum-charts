@@ -14,7 +14,7 @@ import { ReactElement } from 'react';
 import { StoryFn } from '@storybook/react';
 
 import { Chart } from '../../../Chart';
-import { Axis, AxisThumbnail, Bar, BarDirectLabel, Title } from '../../../components';
+import { Axis, AxisThumbnail, Bar, BarDirectLabel, ChartInspect, ChartPopover, Title } from '../../../components';
 import useChartProps from '../../../hooks/useChartProps';
 import { bindWithProps } from '../../../test-utils';
 import { BarProps } from '../../../types';
@@ -168,7 +168,35 @@ LongLabels.args = {
   ...defaultProps,
 };
 
+const dialogContent = (datum) => (
+  <div>
+    <div>Channel: {datum.channel}</div>
+    <div>Change rate: {datum.changeRate}</div>
+  </div>
+);
+
+/** Single-series diverging bar with `accessibleNavigation` — keyboard focus moves left/right across bars, including across the zero baseline. */
+const AccessibleNavigationStory: StoryFn<typeof Bar> = (args): ReactElement => {
+  const chartProps = useChartProps({ data: divergingConversionRateData, width: 700, height: 400, accessibleNavigation: true });
+  return (
+    <Chart {...chartProps}>
+      <Axis position="left" baseline title="Channel" />
+      <Axis position="bottom" grid labelFormat="percentage" title="Change rate" />
+      <Bar {...args} diverging>
+        <ChartInspect>{dialogContent}</ChartInspect>
+        <ChartPopover width={200}>{dialogContent}</ChartPopover>
+      </Bar>
+    </Chart>
+  );
+};
+
+const AccessibleNavigation = bindWithProps(AccessibleNavigationStory);
+AccessibleNavigation.args = {
+  ...defaultProps,
+};
+
 export {
+  AccessibleNavigation,
   Horizontal,
   HorizontalWithThumbnail,
   Vertical,

@@ -14,7 +14,7 @@ import React, { ReactElement } from 'react';
 import { StoryFn } from '@storybook/react';
 
 import { Chart } from '../../../Chart';
-import { Axis, Bar } from '../../../components';
+import { Axis, Bar, ChartInspect, ChartPopover } from '../../../components';
 import { ReferenceLine } from '../../../components/ReferenceLine';
 import useChartProps from '../../../hooks/useChartProps';
 import { bindWithProps } from '../../../test-utils';
@@ -57,4 +57,42 @@ Label.args = {
   label: 'Target',
 };
 
-export { Basic, Label };
+// Categorical dimension so keyboard-nav node ids match the bars' values (numeric wouldn't strict-equal the string id).
+const accessibleNavData = [
+  { browser: 'Chrome', downloads: 27 },
+  { browser: 'Firefox', downloads: 8 },
+  { browser: 'Safari', downloads: 12 },
+  { browser: 'Edge', downloads: 4 },
+];
+
+const dialogContent = (datum) => (
+  <div>
+    <div>Browser: {datum.browser}</div>
+    <div>Downloads: {datum.downloads}</div>
+  </div>
+);
+
+// Reference line drawn over a keyboard-navigable single-series bar (`accessibleNavigation`).
+const AccessibleNavigationStory: StoryFn<typeof ReferenceLine> = (args): ReactElement => {
+  const chartProps = useChartProps({ data: accessibleNavData, width: 600, accessibleNavigation: true });
+  return (
+    <Chart {...chartProps}>
+      <Axis position="left" baseline ticks grid title="Downloads">
+        <ReferenceLine {...args} />
+      </Axis>
+      <Axis position="bottom" baseline title="Browser" />
+      <Bar dimension="browser" metric="downloads">
+        <ChartInspect>{dialogContent}</ChartInspect>
+        <ChartPopover width={200}>{dialogContent}</ChartPopover>
+      </Bar>
+    </Chart>
+  );
+};
+
+const AccessibleNavigation = bindWithProps(AccessibleNavigationStory);
+AccessibleNavigation.args = {
+  value: 20,
+  label: 'Target',
+};
+
+export { AccessibleNavigation, Basic, Label };

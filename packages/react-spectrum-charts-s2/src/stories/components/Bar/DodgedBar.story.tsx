@@ -157,7 +157,30 @@ AxisLabelHighlight.args = {
   color: 'operatingSystem',
 };
 
+const AccessibleNavigationStory: StoryFn<typeof Bar> = (args): ReactElement => {
+  const chartProps = useChartProps({ data: barSeriesData, width: 800, height: 600, accessibleNavigation: true });
+  return (
+    <Chart {...chartProps}>
+      <Axis position={args.orientation === 'horizontal' ? 'left' : 'bottom'} baseline title="Browser" />
+      <Axis position={args.orientation === 'horizontal' ? 'bottom' : 'left'} grid title="Downloads" />
+      <Bar {...args}>
+        <ChartInspect>{dialogContent}</ChartInspect>
+        <ChartPopover width={200}>{dialogContent}</ChartPopover>
+      </Bar>
+      <Legend title="Operating system" highlight />
+    </Chart>
+  );
+};
+
+const AccessibleNavigation = bindWithProps(AccessibleNavigationStory);
+AccessibleNavigation.args = {
+  ...defaultProps,
+  order: 'order',
+  color: 'operatingSystem',
+};
+
 export {
+  AccessibleNavigation,
   Color,
   DodgedStacked,
   DodgedStackedWithLabels,

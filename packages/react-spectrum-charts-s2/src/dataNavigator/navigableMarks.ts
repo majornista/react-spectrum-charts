@@ -31,6 +31,10 @@ export interface NavMarkFields {
   dimension?: string;
   metric?: string;
   color?: unknown;
+  colorOverride?: string;
+  order?: string;
+  dualMetricAxis?: boolean;
+  trellis?: string;
   scaleType?: string;
   metricAxis?: string;
   orientation?: Orientation;

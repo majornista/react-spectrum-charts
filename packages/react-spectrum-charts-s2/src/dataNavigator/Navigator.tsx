@@ -35,6 +35,10 @@ export interface NavigatorProps {
   dimension?: string;
   /** Series / color field (set for stacked bars). */
   color?: string;
+  /** Bar-only: a per-datum color-override field whose values are raw color strings; its accessible label reads a human color name instead of the raw value. */
+  colorOverride?: string;
+  /** Bar-only: the sort-order field (`order` prop), omitted from accessible labels as it has no user-facing meaning. */
+  order?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
   /** Display label for the metric total (e.g. the metric axis's title). Bar-only; falls back to the raw metric field name when not given. */
@@ -47,6 +51,8 @@ export interface NavigatorProps {
   title?: string;
   /** Maps a data field name to its display label (axis/legend title), so labels read as the chart's titles rather than raw field keys. */
   fieldLabels?: Record<string, string>;
+  /** Bar-only: for a dual-metric-axis bar, maps each series (color) value to its own metric axis title. */
+  metricTitleBySeries?: Record<string, string>;
   /** Ref to the positioned container that wraps the chart. */
   containerRef: RefObject<HTMLElement | null>;
   /** Stable id used to namespace the rendered nav elements. */
@@ -79,12 +85,15 @@ export const Navigator = ({
   data,
   dimension,
   color,
+  colorOverride,
+  order,
   metric,
   metricLabel,
   orientation,
   isTimeDimension,
   title,
   fieldLabels,
+  metricTitleBySeries,
   containerRef,
   chartId,
   getView,
@@ -133,6 +142,8 @@ export const Navigator = ({
       data,
       dimension,
       color,
+      colorOverride,
+      order,
       metric,
       metricLabel,
       orientation,
@@ -140,6 +151,7 @@ export const Navigator = ({
       title,
       locale,
       fieldLabels,
+      metricTitleBySeries,
       chartId,
       getView,
       onLeafFocus: stableOnLeafFocus,
@@ -158,6 +170,8 @@ export const Navigator = ({
     data,
     dimension,
     color,
+    colorOverride,
+    order,
     metric,
     metricLabel,
     orientation,
@@ -165,6 +179,7 @@ export const Navigator = ({
     title,
     locale,
     fieldLabels,
+    metricTitleBySeries,
     chartId,
     containerRef,
     stableOnLeafFocus,
