@@ -32,6 +32,7 @@ import {
   DEFAULT_SECONDARY_COLOR,
   FADE_FACTOR,
   FILTERED_TABLE,
+  FOCUSED_ITEM,
   LINE_TYPE_SCALE,
   LINE_WIDTH_SCALE,
   MARK_ID,
@@ -58,6 +59,7 @@ import {
   getTwoDimensionalLineTypes,
   getTwoDimensionalOpacities,
 } from './chartSpecBuilder';
+import { CHART_FOCUS_RING_NAME } from './marks/chartFocusRingUtils';
 import { defaultSignals } from './specTestUtils';
 import { baseData } from './specUtils';
 import { BarOptions, ChartSpecOptions, LineType } from './types';
@@ -447,6 +449,25 @@ describe('Chart spec builder', () => {
 
       expect(spec.usermeta?.animatedMarks).toContain('line0');
       expect(spec.data?.some((d) => d.name === 'line0_hoverTargetData')).toBe(true);
+    });
+  });
+
+  describe('accessibleNavigation dedup across mark types', () => {
+    test('a chart with both a Bar and a Line mark produces exactly one FOCUSED_ITEM signal and one chartFocusRing mark', () => {
+      const spec = buildSpec({
+        ...defaultSpecOptions,
+        accessibleNavigation: true,
+        marks: [
+          defaultBarOptions,
+          { markType: 'line', dimension: 'datetime', metric: 'value', color: 'series' },
+        ],
+      });
+
+      const focusedItemSignals = spec.signals?.filter((signal) => signal.name === FOCUSED_ITEM) ?? [];
+      expect(focusedItemSignals).toHaveLength(1);
+
+      const chartFocusRingMarks = spec.marks?.filter((mark) => mark.name === CHART_FOCUS_RING_NAME) ?? [];
+      expect(chartFocusRingMarks).toHaveLength(1);
     });
   });
 

@@ -32,7 +32,10 @@ import {
   DEFAULT_STROKE_WIDTH_RULE,
   DEFAULT_TRANSFORMED_TIME_DIMENSION,
   FADE_FACTOR,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
   HOVERED_ITEM,
+  INTERACTION_MODALITY,
   LAST_RSC_SERIES_ID,
   LINE_TYPE_SCALE,
   OPACITY_SCALE,
@@ -42,6 +45,7 @@ import {
 import { getS2ColorValue } from '@spectrum-charts/themes';
 
 import { getPopovers } from '../chartPopover/chartPopoverUtils';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
 import { getDeemphasisRamp, getHoverFractionSignal } from '../marks/hoverAnimationUtils';
 import { getLineDrawInXEncoding, getLineDrawInYEncoding } from '../marks/drawInAnimationUtils'
 import {
@@ -270,7 +274,7 @@ export const getLineMark = (lineMarkOptions: LineMarkOptions, dataSource: string
   };
 };
 
-export const getLineDeemphasisOpacitySignal = (name: string): ProductionRule<NumericValueRef> => {
+export const getLineDeemphasisOpacitySignal = (name: string): NumericValueRef => {
   const ramp = getDeemphasisRamp(getHoverFractionSignal(name));
   return {
     signal: `${FADE_FACTOR} + (1 - ${FADE_FACTOR}) * ${ramp}`,
@@ -278,11 +282,25 @@ export const getLineDeemphasisOpacitySignal = (name: string): ProductionRule<Num
 };
 
 export const getLineOpacity = (lineMarkOptions: LineMarkOptions): ProductionRule<NumericValueRef> => {
-  const { displayOnHover, isHoverAnimate, name } = lineMarkOptions;
+  const { accessibleNavigation, color, displayOnHover, isHoverAnimate, name } = lineMarkOptions;
   // displayOnHover overlay marks manage their own visibility via getHighlightedSeriesOpacityRules
   if (displayOnHover) return [DEFAULT_OPACITY_RULE];
 
   if (isHoverAnimate) {
+    // The hover-animation ramp only re-tweens off signals its `on` triggers watch for, so it never
+    // reacts to keyboard-driven focus changes. Give focus an immediate, unanimated value that wins
+    // while keyboard is the most recently used modality; mouse-driven hover falls through to the
+    // existing animated ramp once a mouseover flips interactionModality back to 'pointer'.
+    if (accessibleNavigation && typeof color === 'string') {
+      const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${color}`, 'prefix');
+      return [
+        {
+          test: `${INTERACTION_MODALITY} === 'keyboard' && (isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM}))`,
+          signal: `(${focusMatchExpr}) ? 1 : ${FADE_FACTOR}`,
+        },
+        getLineDeemphasisOpacitySignal(name),
+      ];
+    }
     // Fade deemphasized series; neutral and emphasized both stay fully opaque
     return getLineDeemphasisOpacitySignal(name);
   }
@@ -292,6 +310,8 @@ export const getLineOpacity = (lineMarkOptions: LineMarkOptions): ProductionRule
 };
 
 export const getLineOpacityRules = ({
+  accessibleNavigation,
+  color,
   comboSiblingNames,
   interactiveMarkName,
   popoverMarkName,
@@ -308,8 +328,11 @@ export const getLineOpacityRules = ({
         signal: `indexof(pluck(data('${interactiveMarkName}_highlightedData'), '${SERIES_ID}'), datum.${SERIES_ID}) !== -1 ? 1 : ${FADE_FACTOR}`,
       });
     } else {
+      const hoveredItemTest = accessibleNavigation
+        ? `isValid(${interactiveMarkName}_${HOVERED_ITEM}) && ${INTERACTION_MODALITY} !== 'keyboard'`
+        : `isValid(${interactiveMarkName}_${HOVERED_ITEM})`;
       strokeOpacityRules.push({
-        test: `isValid(${interactiveMarkName}_${HOVERED_ITEM})`,
+        test: hoveredItemTest,
         signal: `${interactiveMarkName}_${HOVERED_ITEM}.${SERIES_ID} === datum.${SERIES_ID} ? 1 : ${FADE_FACTOR}`,
       });
     }
@@ -341,6 +364,17 @@ export const getLineOpacityRules = ({
     });
   }
 
+  // Falls after the hover rule (above) and before the default. The hover rule is gated out once
+  // interactionModality flips to 'keyboard' (see hoveredItemTest above), so this is the fallback
+  // that shows focus whenever keyboard was the most recently used modality.
+  if (accessibleNavigation && typeof color === 'string') {
+    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${color}`, 'prefix');
+    strokeOpacityRules.push({
+      test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
+      signal: `(${focusMatchExpr}) ? 1 : ${FADE_FACTOR}`,
+    });
+  }
+
   strokeOpacityRules.push(DEFAULT_OPACITY_RULE);
 
   return strokeOpacityRules;
@@ -350,6 +384,8 @@ export const getLineOpacityRules = ({
  * Gets the production rules for strokeWidth
  */
 export const getLineStrokeWidth = ({
+  accessibleNavigation,
+  color,
   displayOnHover,
   comboSiblingNames,
   interactiveMarkName,
@@ -368,8 +404,11 @@ export const getLineStrokeWidth = ({
         signal: `indexof(pluck(data('${interactiveMarkName}_highlightedData'), '${SERIES_ID}'), datum.${SERIES_ID}) !== -1 ? ${CHART_SIZE_HOVER_STROKE_WIDTH} : ${CHART_SIZE_STROKE_WIDTH}`,
       });
     } else {
+      const hoveredItemTest = accessibleNavigation
+        ? `isValid(${interactiveMarkName}_${HOVERED_ITEM}) && ${INTERACTION_MODALITY} !== 'keyboard'`
+        : `isValid(${interactiveMarkName}_${HOVERED_ITEM})`;
       strokeWidthRules.push({
-        test: `isValid(${interactiveMarkName}_${HOVERED_ITEM})`,
+        test: hoveredItemTest,
         signal: `${interactiveMarkName}_${HOVERED_ITEM}.${SERIES_ID} === datum.${SERIES_ID} ? ${CHART_SIZE_HOVER_STROKE_WIDTH} : ${CHART_SIZE_STROKE_WIDTH}`,
       });
     }
@@ -398,6 +437,14 @@ export const getLineStrokeWidth = ({
     strokeWidthRules.push({
       test,
       signal: CHART_SIZE_STROKE_WIDTH,
+    });
+  }
+
+  if (accessibleNavigation && typeof color === 'string') {
+    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${color}`, 'prefix');
+    strokeWidthRules.push({
+      test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
+      signal: `(${focusMatchExpr}) ? ${CHART_SIZE_HOVER_STROKE_WIDTH} : ${CHART_SIZE_STROKE_WIDTH}`,
     });
   }
 

@@ -8,11 +8,11 @@ sidebar_position: 5
 Keyboard navigation is an early, work-in-progress feature. It does not yet provide full chart accessibility or screen reader support — treat it as a keyboard-only enhancement, not a complete accessibility solution.
 :::
 
-:::caution Bar charts only
-Keyboard navigation currently supports plain, stacked, dodged, and dual-metric-axis `Bar` charts. Trellis bar configurations and other mark types (Line, Area, Donut, Scatter, etc.) are not yet supported.
+:::caution Bar and Line charts only
+Keyboard navigation currently supports plain, stacked, dodged, and dual-metric-axis `Bar` charts, and single- and multi-series `Line` charts. Trellis bar configurations and other mark types (Area, Donut, Scatter, etc.) are not yet supported.
 :::
 
-Set `accessibleNavigation` on `Chart` to let keyboard users navigate bar chart content — individual bars, stacked segments, and their tooltips and popovers — without a mouse.
+Set `accessibleNavigation` on `Chart` to let keyboard users navigate chart content — individual bars, stacked segments, or line points — and their tooltips and popovers, without a mouse.
 
 ```jsx
 <Chart data={data} accessibleNavigation>
@@ -71,3 +71,11 @@ Axis labels on the categorical bottom axis are also keyboard-navigable when they
 For a stacked `Bar` (`color` set), navigation has an extra layer: `Enter` on the chart root drills into a stack (column), and `Enter` again drills into an individual segment. `Escape` reverses this one layer at a time.
 
 Focusing a stack — before drilling into a segment — shows the dimension-area tooltip or popover, if configured, the same one a mouse hovering the stack's exposed padding would show. See the `targets` prop on [`ChartInspect`](/docs/spectrum2/overview#chartinspect-props).
+
+---
+
+## Line charts
+
+Every `Line` — single- or multi-series — has a line-level focus stop between the chart root and its points: `Enter` on the chart root drills into a line, then `Enter` or `Arrow Right` on the focused line drills into its first point (or `Arrow Left` into its last point). `Escape` reverses this one layer at a time. `Arrow Left`/`Arrow Right` always stay within the current line, wrapping at the ends; for multi-series lines, `Arrow Up`/`Arrow Down` move between lines while at the line level, or jump to the point at the same position in the adjacent line once drilled into a point.
+
+Since a line's points have no persistent rendered mark of their own (the line is one continuous path), a focused point's tooltip and popover are positioned by projecting its data value through the chart's own scales, rather than by reading a rendered mark's bounds.
