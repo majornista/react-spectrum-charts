@@ -16,6 +16,7 @@ import { MARK_ID } from '@spectrum-charts/constants';
 import {
   findFocusedBarSceneItem,
   findFocusedDimensionAreaSceneItem,
+  findFocusedLineSceneItem,
   hideFocusedItemTooltip,
   showFocusedItemTooltip,
 } from './focusedItemTooltip';
@@ -157,5 +158,35 @@ describe('findFocusedDimensionAreaSceneItem()', () => {
     const view = mockDimensionAreaView([{ datum: { browser: 'Firefox' } }]);
 
     expect(findFocusedDimensionAreaSceneItem(view, MARK_NAME, 'browser', 'Chrome')).toBeUndefined();
+  });
+});
+
+describe('findFocusedLineSceneItem()', () => {
+  const LINE_NAME = 'line0';
+
+  const mockLineView = (items: { datum: Record<string, unknown> }[]) =>
+    ({
+      scenegraph: () => ({ root: { items: [{ marktype: 'line', name: LINE_NAME, items }] } }),
+    }) as unknown as View;
+
+  test('finds a rendered line item whose datum carries the given color value', () => {
+    const match = { datum: { series: 'A', value: 28 } };
+    const view = mockLineView([{ datum: { series: 'B', value: 20 } }, match]);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', 'A')).toBe(match);
+  });
+
+  test('returns undefined when no rendered item matches the given color value', () => {
+    const view = mockLineView([{ datum: { series: 'B', value: 20 } }]);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', 'A')).toBeUndefined();
+  });
+
+  // A single-series line has no color field to match on — there's only one line, so any of its rendered items works.
+  test('with no color field (single-series), returns the first rendered item regardless of datum', () => {
+    const items = [{ datum: { value: 28 } }, { datum: { value: 43 } }];
+    const view = mockLineView(items);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, undefined, undefined)).toBe(items[0]);
   });
 });

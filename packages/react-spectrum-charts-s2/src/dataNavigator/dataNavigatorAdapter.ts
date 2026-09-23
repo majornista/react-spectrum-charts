@@ -22,6 +22,7 @@ import {
   FOCUSED_ITEM,
   FOCUSED_REGION,
   HOVERED_ITEM,
+  INTERACTION_MODALITY,
   MARK_ID,
   SELECTED_ITEM,
 } from '@spectrum-charts/constants';
@@ -32,13 +33,16 @@ import { clearAxisFocusRing, getVisibleAxisLabelColumns, padAxisBounds, position
 import { applyHoverParitySignals, findFocusedRow, findFocusedStackRow, getNodeFieldValues, Row } from './barHoverParity';
 import { AxisRegionOptions, NavigableChartType, buildChartStructure, getNodeIdForDatum } from './buildChartStructure';
 import { getNodeRegion, stripRegionPrefix } from './composeRegions';
+import { getFocusedItemBounds, getFocusedItemClientPosition } from './focusedItemGeometry';
 import {
   findFocusedBarSceneItem,
   findFocusedDimensionAreaSceneItem,
+  findFocusedLineSceneItem,
   hideFocusedItemTooltip,
   pageBoundsForItem,
   showAxisLabelTooltip,
   showFocusedItemTooltip,
+  showFocusedItemTooltipAtPosition,
 } from './focusedItemTooltip';
 import './dataNavigator.css';
 
@@ -84,6 +88,10 @@ export interface AttachDataNavigatorOptions {
   order?: string;
   /** Chart orientation. Swaps which arrow keys move between stacks vs. within a stack. Defaults to vertical. */
   orientation?: Orientation;
+  /** Line-only: whether the dimension field is time-scaled; formats it as a date in accessible labels. */
+  isTimeDimension?: boolean;
+  /** Line-only: the line's x-scale type, used to resolve a focused point's rendered position for popover/tooltip anchoring. */
+  scaleType?: string;
   /** Maps a data field to its axis/legend title. Drives the focused leaf's accessible name and, for bars without a ChartInspect, a clean focus tooltip listing only these fields. */
   fieldLabels?: Record<string, string>;
   /** Per-series metric-axis titles for dual-metric-axis bars. */
@@ -127,6 +135,95 @@ interface Bounds {
   y2: number;
 }
 
+/** The subset of a navigable mark's fields a ChartNavStrategy needs, gathered once per call instead of threaded as separate params. */
+interface StrategyContext {
+  markName: string;
+  dimension: string;
+  color?: string;
+  metric?: string;
+  scaleType?: string;
+}
+
+/**
+ * Everything about keyboard-navigation focus behavior that differs by chart type, resolved once via
+ * `chartNavStrategies` instead of a `chartType === '...'` branch at each call site. Bar's methods
+ * anchor to a real rendered scene item; Line's project a position from its data value through the
+ * chart's scales, since a line's points (and, for `showLeafTooltip`, a Line's own rendered path) have
+ * no persistent per-datum scene item the way every Bar row does.
+ */
+interface ChartNavStrategy {
+  /** Bounds for a division-level (dimensionLevel === 2) node's own rendered mark. `undefined` falls back to the full container. */
+  resolveDivisionBounds: (view: View, container: HTMLElement, node: NodeObject, ctx: StrategyContext) => Bounds | undefined;
+  /** Bounds for a leaf node's own rendered mark/projected position. `undefined` falls back to the full container. */
+  resolveLeafBounds: (view: View, container: HTMLElement, row: Row, ctx: StrategyContext) => Bounds | undefined;
+  /** Chart-local bounds (matching `markClickUtils.ts`'s `getItemBounds` coordinate space) for anchoring a leaf's popover. `undefined` skips opening it. */
+  resolveLeafPopoverBounds: (view: View, row: Row, ctx: StrategyContext) => MarkBounds | undefined;
+  /** Drives the "focused" visual look for a real content node (Bar: real hover-signal parity; Line: interactionModality). */
+  applyFocusedLook: (view: View, node: NodeObject | null, ctx: StrategyContext, dimensionOnly?: boolean) => void;
+  /** Shows (or hides) a leaf's tooltip. */
+  showLeafTooltip: (container: HTMLElement, view: View, row: Row | undefined, value: Row | null, ctx: StrategyContext) => void;
+  /** Whether Space on a focused division node opens a division-level popover (Bar's whole-stack popover; Line has none). */
+  canOpenDivisionPopover: boolean;
+}
+
+const barNavStrategy: ChartNavStrategy = {
+  resolveDivisionBounds: (view, container, node, { markName, dimension }) => {
+    // Resolved directly rather than via findFocusedStackRow, which reads a stacked-only data source and would throw for a dodged bar.
+    const { dimensionValue } = getNodeFieldValues(node, dimension);
+    const item = dimensionValue != null ? findFocusedDimensionAreaSceneItem(view, markName, dimension, dimensionValue) : undefined;
+    return item ? pageBoundsForItem(view, container, item) : undefined;
+  },
+  resolveLeafBounds: (view, container, row, { markName }) => {
+    const item = findFocusedBarSceneItem(view, markName, row[MARK_ID]);
+    return item ? pageBoundsForItem(view, container, item) : undefined;
+  },
+  resolveLeafPopoverBounds: (view, row, { markName }) => {
+    const sceneItem = findFocusedBarSceneItem(view, markName, row[MARK_ID]);
+    return sceneItem ? getItemBounds(sceneItem as ActionItem) : undefined;
+  },
+  applyFocusedLook: (view, node, { markName, dimension, color }, dimensionOnly) =>
+    applyHoverParitySignals(view, { markName, dimension, color }, node, dimensionOnly),
+  showLeafTooltip: (container, view, _row, value, { markName }) => showFocusedItemTooltip(container, view, `${markName}_focusRing`, value),
+  canOpenDivisionPopover: true,
+};
+
+const lineNavStrategy: ChartNavStrategy = {
+  resolveDivisionBounds: (view, container, node, { markName, color }) => {
+    // A line's division represents the whole line — anchor to its own rendered path bounds, the same as a real click would (see markClickUtils.ts's getItemBounds).
+    const colorValue = color ? (node.data as Record<string, unknown> | undefined)?.[color] : undefined;
+    const item = findFocusedLineSceneItem(view, markName, color, colorValue);
+    return item ? pageBoundsForItem(view, container, item) : undefined;
+  },
+  resolveLeafBounds: (view, container, row, { dimension, metric, scaleType }) =>
+    metric ? pageBoundsForBox(view, container, getFocusedItemBounds(view, row, { dimension, metric, scaleType })) : undefined,
+  resolveLeafPopoverBounds: (view, row, { dimension, metric, scaleType }) =>
+    metric ? getFocusedItemBounds(view, row, { dimension, metric, scaleType }) : undefined,
+  applyFocusedLook: (view) => applyInteractionModality(view),
+  showLeafTooltip: (container, view, row, value, { dimension, metric, scaleType }) => {
+    // A Line point has no persistent rendered scene item to anchor a ring-based tooltip to — position it via scale projection instead.
+    const position = row && metric ? getFocusedItemClientPosition(view, container, row, { dimension, metric, scaleType }) : undefined;
+    if (position) showFocusedItemTooltipAtPosition(container, view, position, value);
+  },
+  canOpenDivisionPopover: false,
+};
+
+const chartNavStrategies: Record<NavigableChartType, ChartNavStrategy> = {
+  bar: barNavStrategy,
+  line: lineNavStrategy,
+};
+
+/** Converts a chart-local box (as returned by getFocusedItemBounds) into page-absolute bounds, the same conversion pageBoundsForItem applies to a real scene item's bounds. */
+const pageBoundsForBox = (view: View, container: HTMLElement, bounds: Bounds): Bounds => {
+  const [originX, originY] = view.origin();
+  const containerRect = container.getBoundingClientRect();
+  return {
+    x1: containerRect.left + originX + bounds.x1,
+    y1: containerRect.top + originY + bounds.y1,
+    x2: containerRect.left + originX + bounds.x2,
+    y2: containerRect.top + originY + bounds.y2,
+  };
+};
+
 /**
  * Resolves page-absolute bounds for the mark a focused content node represents, so `.dn-node` can be
  * sized to it for screen-magnifier support.
@@ -136,22 +233,22 @@ const resolveContentFocusBounds = (
   view: View,
   container: HTMLElement,
   node: NodeObject,
+  chartType: NavigableChartType,
   markName: string,
   dimension: string,
-  color: string | undefined
+  color: string | undefined,
+  metric: string | undefined,
+  scaleType: string | undefined
 ): Bounds | undefined => {
   if (node.dimensionLevel === 1) return undefined;
+  const strategy = chartNavStrategies[chartType];
+  const ctx: StrategyContext = { markName, dimension, color, metric, scaleType };
 
-  if (node.dimensionLevel == null) {
-    const row = findFocusedRow(view, node, dimension, color);
-    const item = row ? findFocusedBarSceneItem(view, markName, row[MARK_ID]) : undefined;
-    return item ? pageBoundsForItem(view, container, item) : undefined;
+  if (node.dimensionLevel != null) {
+    return strategy.resolveDivisionBounds(view, container, node, ctx);
   }
-
-  // Resolve the dimension directly rather than via findFocusedStackRow, which reads a stacked-only data source and would throw for a dodged bar.
-  const { dimensionValue } = getNodeFieldValues(node, dimension);
-  const item = dimensionValue != null ? findFocusedDimensionAreaSceneItem(view, markName, dimension, dimensionValue) : undefined;
-  return item ? pageBoundsForItem(view, container, item) : undefined;
+  const row = findFocusedRow(view, node, dimension, color);
+  return row ? strategy.resolveLeafBounds(view, container, row, ctx) : undefined;
 };
 
 /** vega-tooltip's default DOM element id — it toggles the `visible` class on this single shared element. */
@@ -175,7 +272,10 @@ const nodeFocusSignals = (node: NodeObject): FocusSignals => {
   if (node.dimensionLevel === 1) {
     return { ...CLEARED_FOCUS, region: 'chart' };
   }
-  const dimensionValue = node.derivedNode ? node.data?.[node.derivedNode] : undefined;
+  // A division with no derivedNode (a single-series Line's one implicit line) has no data field
+  // value to report — fall back to the node's own id so this state is still distinguishable from
+  // nothing being focused at all (both would otherwise collapse to the same null dimension value).
+  const dimensionValue = node.derivedNode ? node.data?.[node.derivedNode] : node.id;
   const dimension = dimensionValue == null ? null : String(dimensionValue);
   return { ...CLEARED_FOCUS, dimension };
 };
@@ -190,6 +290,20 @@ const applyFocusSignals = (view: View | undefined, { item, region, dimension }: 
   } catch {
     // FOCUSED_* only exist with accessibleNavigation and can be absent on a rebuilding/finalized view.
     return undefined;
+  }
+};
+
+/**
+ * Marks keyboard as the most recent input modality — Line's accessibleNavigation opacity/highlight
+ * logic reads this directly (unlike Bar, whose hover-parity mechanism doesn't need it). Wrapped
+ * independently of applyFocusSignals: this signal only exists on a navigable Line, so a Bar-only
+ * chart (which never registers it) must not have this throw and skip the FOCUSED_* signal writes above.
+ */
+const applyInteractionModality = (view: View | undefined): void => {
+  try {
+    view?.signal(INTERACTION_MODALITY, 'keyboard');
+  } catch {
+    // Absent unless a navigable Line registered it — no-op for Bar-only charts.
   }
 };
 
@@ -218,10 +332,12 @@ const showTooltipForFocusedNode = (
   container: HTMLElement,
   view: View,
   node: NodeObject,
+  chartType: NavigableChartType,
   markName: string,
   dimension: string,
   color: string | undefined,
   metric: string | undefined,
+  scaleType: string | undefined,
   fieldLabels: Record<string, string>,
   hasChartInspect: boolean
 ): void => {
@@ -230,7 +346,7 @@ const showTooltipForFocusedNode = (
     // Leaf: full datum for ChartInspect, otherwise a clean axis-titled subset.
     const row = findFocusedRow(view, node, dimension, color);
     const value = row ? buildLeafTooltipValue(row, markName, hasChartInspect, fieldLabels, [dimension, color, metric]) : null;
-    showFocusedItemTooltip(container, view, `${markName}_focusRing`, value);
+    chartNavStrategies[chartType].showLeafTooltip(container, view, row, value, { markName, dimension, color, metric, scaleType });
   } else if (signals.dimension != null) {
     // Division (whole stack): empty unless a dimensionArea-targeted ChartInspect exists, matching real hover.
     const stackRow = findFocusedStackRow(view, node, dimension, markName);
@@ -258,10 +374,12 @@ const clickToFocusHandlers = new WeakMap<View, ViewEventHandler>();
 const guardHoverParityAgainstMouseClear = (
   container: HTMLElement,
   view: View,
+  chartType: NavigableChartType,
   markName: string,
   dimension: string,
   color: string | undefined,
   metric: string | undefined,
+  scaleType: string | undefined,
   fieldLabels: Record<string, string>,
   hasChartInspect: boolean,
   getFocusedNode: () => NodeObject | undefined
@@ -279,14 +397,16 @@ const guardHoverParityAgainstMouseClear = (
     // The chart root and axis root have no specific row to restore — nothing to guard.
     if (!node || node.dimensionLevel === 1) return;
     const isAxisNode = getNodeRegion(node) === 'xAxis';
-    applyHoverParitySignals(view, { markName, dimension, color }, node, isAxisNode);
+    chartNavStrategies[chartType].applyFocusedLook(view, node, { markName, dimension, color, metric, scaleType }, isAxisNode);
     // Axis ticks don't drive the chart tooltip (matching real axis-label hover), only the bar/stack does.
     if (isAxisNode) {
       view.runAfter((v) => v.runAsync());
       return;
     }
     view.runAfter((v) => {
-      v.runAsync().then(() => showTooltipForFocusedNode(container, v, node, markName, dimension, color, metric, fieldLabels, hasChartInspect));
+      v.runAsync().then(() =>
+        showTooltipForFocusedNode(container, v, node, chartType, markName, dimension, color, metric, scaleType, fieldLabels, hasChartInspect)
+      );
     });
   };
   try {
@@ -316,6 +436,8 @@ export const attachDataNavigator = ({
   metric,
   order,
   orientation,
+  isTimeDimension,
+  scaleType,
   fieldLabels,
   metricTitleBySeries,
   hasChartInspect,
@@ -339,7 +461,23 @@ export const attachDataNavigator = ({
       ? { ...xAxis, visibleValues: getVisibleAxisLabelColumns(initialView, container, 'bottom').map((column) => column.value) }
       : xAxis;
 
-  const built = buildChartStructure({ chartType, data, dimension, color, type, colorOverride, locale, metric, order, orientation, title, fieldLabels, metricTitleBySeries, xAxis: xAxisRegion });
+  const built = buildChartStructure({
+    chartType,
+    data,
+    dimension,
+    color,
+    type,
+    colorOverride,
+    locale,
+    metric,
+    order,
+    orientation,
+    isTimeDimension,
+    title,
+    fieldLabels,
+    metricTitleBySeries,
+    xAxis: xAxisRegion,
+  });
   if (!built) return;
   const { structure, entryPoint } = built;
 
@@ -363,8 +501,18 @@ export const attachDataNavigator = ({
 
   const view = getView();
   if (view && markName && dimension) {
-    guardHoverParityAgainstMouseClear(container, view, markName, dimension, color, metric, fieldLabels ?? {}, hasChartInspect ?? false, () =>
-      focusInsideWidget && current ? structure.nodes[current] : undefined
+    guardHoverParityAgainstMouseClear(
+      container,
+      view,
+      chartType,
+      markName,
+      dimension,
+      color,
+      metric,
+      scaleType,
+      fieldLabels ?? {},
+      hasChartInspect ?? false,
+      () => (focusInsideWidget && current ? structure.nodes[current] : undefined)
     );
   }
 
@@ -464,10 +612,10 @@ export const attachDataNavigator = ({
   }
 
   /** Sets the shared context refs and triggers the popover through the same DOM-button-click a real click uses. */
-  function triggerBarPopover(row: Row, sceneItem: unknown) {
+  function triggerPointPopover(row: Row, bounds: MarkBounds) {
     if (!markName || !selectedData || !selectedDataBounds || !selectedDataName) return;
     selectedData.current = { ...row, [COMPONENT_NAME]: markName } as unknown as Datum;
-    selectedDataBounds.current = getItemBounds(sceneItem as ActionItem);
+    selectedDataBounds.current = bounds;
     selectedDataName.current = markName;
     if (keyboardPopoverComponentName) keyboardPopoverComponentName.current = markName;
     if (triggerPopover(chartId, markName, 'click')) {
@@ -484,14 +632,14 @@ export const attachDataNavigator = ({
     }
   }
 
-  /** Activates the focused leaf bar/segment — opens its popover (if any) and fires its `onClick` (if any), the same pair a real click runs. */
-  function activateBar(node: NodeObject) {
+  /** Activates the focused leaf bar/segment/point — opens its popover (if any) and fires its `onClick` (if any), the same pair a real click runs. */
+  function activateLeaf(node: NodeObject) {
     const view = getView();
     if (!view || !markName || !dimension) return;
     const row = findFocusedRow(view, node, dimension, color);
     if (!row) return;
-    const sceneItem = findFocusedBarSceneItem(view, markName, row[MARK_ID]);
-    if (sceneItem) triggerBarPopover(row, sceneItem);
+    const bounds = chartNavStrategies[chartType].resolveLeafPopoverBounds(view, row, { markName, dimension, color, metric, scaleType });
+    if (bounds) triggerPointPopover(row, bounds);
     onNodeClick?.(row as unknown as Datum);
   }
 
@@ -503,7 +651,7 @@ export const attachDataNavigator = ({
     if (!stackRow) return;
     const sceneItem = findFocusedDimensionAreaSceneItem(view, markName, dimension, stackRow[dimension]);
     if (!sceneItem) return;
-    triggerBarPopover(stackRow, sceneItem);
+    triggerPointPopover(stackRow, getItemBounds(sceneItem as ActionItem));
   }
 
   function navigate(node: NodeObject) {
@@ -530,7 +678,7 @@ export const attachDataNavigator = ({
     const view = getView();
     const contentBounds =
       !isAxisNode && view && markName && dimension
-        ? resolveContentFocusBounds(view, container, node, markName, dimension, color)
+        ? resolveContentFocusBounds(view, container, node, chartType, markName, dimension, color, metric, scaleType)
         : undefined;
     if (contentBounds) {
       positionOverlayAtBounds(el, contentBounds);
@@ -549,14 +697,14 @@ export const attachDataNavigator = ({
       // same as a real click. Enter still drills into non-leaves (they own a 'child' edge); leaves don't.
       if ((event.code === 'Enter' || event.code === 'Space') && isChartNode && node.dimensionLevel == null) {
         event.preventDefault();
-        activateBar(node);
+        activateLeaf(node);
         return;
       }
       // Space on a whole stack opens its dimension-area popover (Enter keeps drilling into segments);
-      // axis labels have no popover at all.
+      // axis labels and a Line's whole-line division have no popover of their own.
       if (event.code === 'Space') {
         event.preventDefault();
-        if (isChartNode && node.dimensionLevel === 2) {
+        if (isChartNode && node.dimensionLevel === 2 && chartNavStrategies[chartType].canOpenDivisionPopover) {
           openStackPopover(node);
         }
         return;
@@ -597,7 +745,7 @@ export const attachDataNavigator = ({
       } else {
         clearAxisFocusRing(focusRing);
         if (view && markName && dimension) {
-          applyHoverParitySignals(view, { markName, dimension, color }, node);
+          chartNavStrategies[chartType].applyFocusedLook(view, node, { markName, dimension, color, metric, scaleType });
         }
       }
       const signals = nodeFocusSignals(node);
@@ -608,7 +756,7 @@ export const attachDataNavigator = ({
             showFocusedItemTooltip(container, view, `${markName ?? 'bar0'}_focusRing`, null);
             return;
           }
-          showTooltipForFocusedNode(container, view, node, markName, dimension, color, metric, fieldLabels ?? {}, hasChartInspect ?? false);
+          showTooltipForFocusedNode(container, view, node, chartType, markName, dimension, color, metric, scaleType, fieldLabels ?? {}, hasChartInspect ?? false);
         });
     });
 

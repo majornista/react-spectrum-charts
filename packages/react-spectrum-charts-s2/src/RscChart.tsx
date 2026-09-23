@@ -180,6 +180,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
         trellis?: boolean;
         name?: string;
         orientation?: Orientation;
+        scaleType?: string;
       }
     | undefined;
   const navColor = typeof navFields?.color === 'string' ? navFields.color : undefined;
@@ -189,8 +190,12 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   const navTrellis = navFields?.trellis;
   const navType = navFields?.type;
   const navDualMetricAxis = navFields?.dualMetricAxis;
+  // Line has no orientation prop — always defaults to vertical, so this only ever swaps arrow keys for Bar.
   const navOrientation: Orientation = navFields?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
   const markName = navFields?.name ?? (navChartType ? `${navChartType}0` : undefined);
+  // Line's dimension defaults to the time dimension unless it's been explicitly given a discrete scaleType.
+  const navScaleType = navChartType === 'line' ? navFields?.scaleType ?? 'time' : undefined;
+  const navIsTimeDimension = navChartType === 'line' ? navScaleType === 'time' : undefined;
 
   // Axis/legend titles keyed by the field they represent, so a focused bar's accessible name and
   // (for bars without a ChartInspect) its focus tooltip read as the chart's own titles rather than
@@ -302,12 +307,14 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   // navigator mid-interaction, discarding its in-progress keyboard-focus state.
   // Only for vertical bars: the bottom axis carries the categorical dimension. A horizontal bar's
   // categorical axis is the left axis, so its bottom-axis region would not be the dimension one.
+  // Line's x-axis is a continuous time/linear scale, not the categorical tick structure this region
+  // expects, so it's excluded here — not yet wired into a navigable axis region.
   const xAxis: AxisRegionOptions | undefined = useMemo(
     () =>
-      xAxisChild && navFields?.dimension && navOrientation === 'vertical'
+      xAxisChild && navFields?.dimension && navOrientation === 'vertical' && navChartType === 'bar'
         ? { field: navFields.dimension, type: 'categorical', title: (xAxisChild.props as { title?: string }).title }
         : undefined,
-    [xAxisChild, navFields?.dimension, navOrientation]
+    [xAxisChild, navFields?.dimension, navOrientation, navChartType]
   );
 
   const getView = useCallback(() => chartView.current ?? undefined, [chartView]);
@@ -367,6 +374,8 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             metric={navFields?.metric}
             order={navFields?.order}
             orientation={navOrientation}
+            isTimeDimension={navIsTimeDimension}
+            scaleType={navScaleType}
             fieldLabels={fieldLabels}
             metricTitleBySeries={navMetricTitleBySeries}
             hasChartInspect={hasChartInspect}

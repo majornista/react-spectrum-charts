@@ -83,6 +83,15 @@ export const findFocusedDimensionAreaSceneItem = (
 ): SceneNode | undefined =>
   findSceneItems(view, 'rect', `${markName}_${DIMENSION_HOVER_AREA}`).find((item) => item.datum?.[dimension] === dimensionValue);
 
+/** Finds a Line's own rendered path (not its focus ring) for a whole-line focus, matched by color value (or the first item when there's no color field). */
+export const findFocusedLineSceneItem = (
+  view: View,
+  markName: string,
+  color: string | undefined,
+  colorValue: unknown
+): SceneNode | undefined =>
+  findSceneItems(view, 'line', markName).find((item) => color === undefined || item.datum?.[color] === colorValue);
+
 /** Bounds are group-relative; walk up the mark's owning groups to make them view-relative. */
 const absoluteBounds = (item: SceneNode): Bounds | undefined => {
   const b = item.bounds;
@@ -161,4 +170,30 @@ export const showFocusedItemTooltip = (container: HTMLElement, view: View, ringM
   };
 
   tooltipCallback(fakeHandler, syntheticEvent, ringItem, value);
+};
+
+/**
+ * Same as `showFocusedItemTooltip`, but for a mark with no rendered focus-ring item to read bounds
+ * from (e.g. a Line point, which has no persistent rendered scene item) — takes a precomputed
+ * page-absolute position instead.
+ */
+export const showFocusedItemTooltipAtPosition = (
+  container: HTMLElement,
+  view: View,
+  position: { clientX: number; clientY: number },
+  value: unknown
+): void => {
+  const tooltipCallback = getRegisteredTooltipCallback(view);
+  if (!tooltipCallback) return;
+
+  if (value == null) {
+    tooltipCallback(undefined, undefined, undefined, null);
+    return;
+  }
+
+  const [originX, originY] = view.origin();
+  const fakeHandler = { _el: container, _origin: [originX, originY] };
+  const syntheticEvent = { type: 'focus', ...position };
+  // No real scene item exists for a Line point; vega-tooltip's positioning only reads clientX/clientY off the event.
+  tooltipCallback(fakeHandler, syntheticEvent, undefined, value);
 };

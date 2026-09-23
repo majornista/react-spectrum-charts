@@ -1,4 +1,7 @@
 {
   "bar.description": "{metricLabel} by {dimension} chart.{count, plural, =0 {} one { # bar}. other { # bars}.}",
-  "bar.stackedDescription": "{metricLabel} by {dimension} chart, grouped by {color}. {count, plural, one {# group} other {# groups}}."
+  "bar.stackedDescription": "{metricLabel} by {dimension} chart, grouped by {color}. {count, plural, one {# group} other {# groups}}.",
+  "line.description": "{hasTitle, select, true {{title}. } other {}}Line chart. {dimension} along the x-axis. Contains {count, plural, one {# point} other {# points}}. Use Enter or the right arrow key to drill into the line''s points, then the left and right arrow keys to navigate.",
+  "line.multiDescription": "{hasTitle, select, true {{title}. } other {}}Multi-series line chart. {dimension} along the x-axis, stacked by {color}. Contains {count, plural, one {# line} other {# lines}}. Use the up and down arrow keys to move between lines, and Enter or the right arrow key to drill into a line''s points.",
+  "line.lineNode": "{hasValue, select, true {Line {value}} other {Line}}. Contains {count, plural, one {# point} other {# points}}."
 }
