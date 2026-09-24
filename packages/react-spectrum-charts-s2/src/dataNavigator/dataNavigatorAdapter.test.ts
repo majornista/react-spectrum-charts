@@ -23,6 +23,7 @@ import {
   HOVERED_ITEM,
   MARK_ID,
   SELECTED_ITEM,
+  SINGLE_LINE_NODE_ID,
 } from '@spectrum-charts/constants';
 import { Datum, MarkBounds } from '@spectrum-charts/vega-spec-builder-s2';
 
@@ -1288,6 +1289,149 @@ describe('attachDataNavigator()', () => {
       simulateMouseoutClear('bar0_dimensionHoverArea_hoveredItem');
 
       expect(signal).toHaveBeenCalledWith('bar0_dimensionHoverArea_hoveredItem', data[0]);
+    });
+  });
+
+  describe('line charts', () => {
+    const lineData = [
+      { datetime: 0, value: 28 },
+      { datetime: 1, value: 43 },
+    ];
+
+    const attachLine = (overrides = {}) =>
+      attachDataNavigator({
+        container,
+        chartType: 'line',
+        data: lineData,
+        dimension: 'datetime',
+        metric: 'value',
+        scaleType: 'time',
+        markName: 'line0',
+        chartId: 'line-chart',
+        getView: () => view,
+        selectedData: { current: null },
+        selectedDataBounds: { current: { x1: 0, y1: 0, x2: 0, y2: 0 } },
+        selectedDataName: { current: '' },
+        ...overrides,
+      });
+
+    // The real rendered line0 path's own scenegraph items — unlike a bar row, every item for a given
+    // line/facet shares that line's own bounding box (see dataNavigatorAdapter.ts's resolveContentFocusBounds).
+    let lineItems: { datum: Record<string, unknown>; bounds: { x1: number; y1: number; x2: number; y2: number } }[];
+
+    beforeEach(() => {
+      // A leaf point has no rendered scene item — its position is scale-projected instead (see focusedItemGeometry.ts).
+      (view as unknown as { scale: jest.Mock }).scale = jest.fn((name: string) => {
+        if (name === 'xTime') return (v: unknown) => (v as number) * 10;
+        if (name === 'yLinear') return (v: unknown) => (v as number) * 2;
+        throw new Error(`Unrecognized scale: ${name}`);
+      });
+      (view.data as jest.Mock).mockReturnValue(lineData);
+      lineItems = [{ datum: { datetime: 0, value: 28 }, bounds: { x1: 10, y1: 20, x2: 200, y2: 90 } }];
+      (view as unknown as { scenegraph: () => unknown }).scenegraph = () => ({
+        root: { items: [{ marktype: 'line', name: 'line0', items: lineItems }] },
+      });
+    });
+
+    const enterFirstPoint = () => {
+      attachLine();
+      entryButton().click(); // chart root
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> single line (child edge)
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // line -> first point (child edge)
+    };
+
+    test('renders an entry button for a line chart', () => {
+      attachLine();
+      expect(entryButton()).toBeTruthy();
+    });
+
+    test('focusing the first point sets the single-item focus signal', () => {
+      enterFirstPoint();
+      expect(signaledWith(FOCUSED_ITEM, '1')).toBe(true);
+    });
+
+    // Regression: a single-series line's division has no derivedNode/color value to report, so it
+    // previously collapsed to the same null FOCUSED_DIMENSION as nothing being focused at all —
+    // the line-level focus halo (keyed on FOCUSED_DIMENSION) never appeared. See dataNavigatorAdapter.ts's nodeFocusSignals.
+    test('focusing the single line itself (not yet a point) sets FOCUSED_DIMENSION to the single-line node id', () => {
+      attachLine();
+      entryButton().click(); // chart root
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> single line
+      expect(signaledWith(FOCUSED_DIMENSION, SINGLE_LINE_NODE_ID)).toBe(true);
+    });
+
+    // Regression: the .dn-node overlay previously fell back to the full chart container when the
+    // line itself (not a point) was focused, making the keyboard/screen-magnifier hit target
+    // indeterminately large instead of matching the real rendered line's bounds.
+    test('focusing the single line itself sizes .dn-node to the real rendered line path, not the full container', () => {
+      attachLine();
+      entryButton().click(); // chart root
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> single line
+
+      expect(focused().style).toMatchObject({ left: '10px', top: '20px', width: '190px', height: '70px' });
+    });
+
+    test('focusing a point sets interactionModality to keyboard, independent of the FOCUSED_* signals', () => {
+      enterFirstPoint();
+      expect(signaledWith('interactionModality', 'keyboard')).toBe(true);
+    });
+
+    test('does not drive the real hoveredItem signal for a line (unlike Bar hover-parity)', () => {
+      enterFirstPoint();
+      expect(signal.mock.calls.some(([n]) => n === 'line0_hoveredItem')).toBe(false);
+    });
+
+    test('shows a tooltip at the scale-projected position for a focused point', async () => {
+      enterFirstPoint();
+      await Promise.resolve();
+
+      // x = datetime(0)*10 = 0, y = value(28)*2 = 56 — matches the mocked scale functions above.
+      expect(tooltipCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ _el: container }),
+        expect.objectContaining({ clientX: 0, clientY: 56 }),
+        undefined,
+        expect.anything()
+      );
+    });
+
+    test('Enter on a focused point triggers its popover, anchored to the projected bounds', () => {
+      enterFirstPoint();
+
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+
+      expect(triggerPopover).toHaveBeenCalledWith('line-chart', 'line0', 'click');
+      expect(signaledWith(SELECTED_ITEM, undefined)).toBe(false);
+    });
+
+    test('fires onNodeClick with the focused point\'s row when activated', () => {
+      const onNodeClick = jest.fn();
+      attachLine({ onNodeClick });
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> line
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // line -> first point
+
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // activate the focused point
+
+      expect(onNodeClick).toHaveBeenCalledWith(expect.objectContaining({ datetime: 0, value: 28 }));
+    });
+
+    test('Space at the line-division level does not attempt to open a whole-line popover', () => {
+      attachLine();
+      entryButton().click(); // chart root
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> single line (a dimensionLevel-2 division)
+
+      fireEvent.keyDown(focused(), { key: ' ', code: 'Space' });
+
+      expect(triggerPopover).not.toHaveBeenCalled();
+    });
+
+    test('reapplies keyboard modality when a real mouseout clobbers the shared hover signal while a point is focused', () => {
+      enterFirstPoint();
+      signal.mockClear();
+
+      simulateMouseoutClear('line0_hoveredItem');
+
+      expect(signal).toHaveBeenCalledWith('interactionModality', 'keyboard');
     });
   });
 });

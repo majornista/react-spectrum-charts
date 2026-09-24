@@ -16,10 +16,11 @@ import { Orientation, SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
 
 import { AxisFieldType, buildAxisStructure } from './buildAxisStructure';
 import { buildBarStructure, segmentId } from './buildBarStructure';
+import { buildLineStructure, getLineNodeId } from './buildLineStructure';
 import { composeRegions, NamedRegion } from './composeRegions';
 import { getBaseNavigationRules } from './navigationRules';
 
-export type NavigableChartType = 'bar';
+export type NavigableChartType = 'bar' | 'line';
 
 export interface AxisRegionOptions {
   /** The field this axis represents — the dimension for a categorical x-axis. */
@@ -59,6 +60,8 @@ export interface ChartStructureOptions {
   fieldLabels?: Record<string, string>;
   /** Per-series metric-axis titles for dual-metric-axis bars. */
   metricTitleBySeries?: Record<string, string>;
+  /** Whether a line's dimension field is time-scaled; formats it as a date in accessible labels. */
+  isTimeDimension?: boolean;
   /** When provided, adds a sibling-navigable x-axis region alongside chart content (Left/Right moves between them). */
   xAxis?: AxisRegionOptions;
 }
@@ -70,6 +73,7 @@ export interface ChartStructure {
 
 const contentStructureBuilders: Record<NavigableChartType, (options: ChartStructureOptions) => ChartStructure> = {
   bar: buildBarStructure,
+  line: buildLineStructure,
 };
 
 /**
@@ -82,6 +86,7 @@ export const getNodeIdForDatum = (
   datum: SimpleData,
   { dimension = DEFAULT_CATEGORICAL_DIMENSION, color }: { dimension?: string; color?: string }
 ): string | undefined => {
+  if (chartType === 'line') return getLineNodeId(datum, color);
   if (chartType !== 'bar') return undefined;
   const dimensionValue = datum[dimension];
   if (dimensionValue == null) return undefined;

@@ -9,19 +9,13 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-/* eslint-disable */
-// AUTO-GENERATED from intl/*.json. Do not edit by hand.
-import type { LocalizedString } from '@internationalized/string';
+import { NodeObject, Structure } from 'data-navigator';
 
-import enUS from './en-US';
-
-export type DataNavigatorMessageKey =
-  | 'bar.description'
-  | 'bar.stackedDescription'
-  | 'line.description'
-  | 'line.multiDescription'
-  | 'line.lineNode';
-
-export const dataNavigatorStrings: Record<string, Record<DataNavigatorMessageKey, LocalizedString>> = {
-  'en-US': enUS,
+/** Every node rendered in keyboard mode needs an aria-label — shared by every chart type's structure builder. */
+export const applyDefaultLabels = (structure: Structure, labelFor: (node: NodeObject) => string): void => {
+  for (const node of Object.values(structure.nodes)) {
+    if (!node.semantics?.label) {
+      node.semantics = { ...node.semantics, label: labelFor(node) };
+    }
+  }
 };
