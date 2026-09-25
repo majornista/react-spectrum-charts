@@ -16,13 +16,18 @@ import {
   DEFAULT_OPACITY_RULE,
   FADE_FACTOR,
   FILTERED_TABLE,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
   GROUP_ID,
+  HOVERED_ITEM,
+  INTERACTION_MODALITY,
   ROUNDED_SQUARE_PATH,
   SERIES_ID,
   VISIBILITY_OFF_PATH,
 } from '@spectrum-charts/constants';
 import { spectrum2Colors } from '@spectrum-charts/themes';
 
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
 import { getDeemphasisRamp } from '../marks/hoverAnimationUtils';
 import { defaultLegendOptions } from './legendTestUtils';
 import {
@@ -294,5 +299,86 @@ describe('getLegendOpacity()', () => {
     const result = getLegendOpacity(defaultLegendOptions, { animatedMarks: ['line0', 'line1'] });
     expect(Array.isArray(result) && result).toHaveLength(3);
     expect(Array.isArray(result) && result[2]).toEqual(DEFAULT_OPACITY_RULE);
+  });
+
+  test('prepends a keyboard-focus rule ahead of the hover-animation ramp when accessibleNavigation is set', () => {
+    const options = { ...defaultLegendOptions, accessibleNavigation: true };
+    const result = getLegendOpacity(options, { animatedMarks: ['line0'], focusedDimensionIsLegendColor: true });
+    expect(Array.isArray(result) && result[0]).toStrictEqual({
+      test: `${INTERACTION_MODALITY} === 'keyboard' && (isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM}))`,
+      signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', 'prefix')}) ? 1 : ${FADE_FACTOR}`,
+    });
+  });
+
+  test('does not add a keyboard-focus rule when accessibleNavigation is unset', () => {
+    const result = getLegendOpacity(defaultLegendOptions, { animatedMarks: ['line0'] });
+    expect(Array.isArray(result) && result).toHaveLength(2);
+  });
+
+  // Regression: a hover-animated Bar also populates animatedMarks (see barSpecBuilder.ts's
+  // addUserMetaAnimatedMark), but never registers INTERACTION_MODALITY — only a Line with
+  // accessibleNavigation does. Referencing it here unconditionally on animatedMarks alone
+  // previously crashed the whole chart spec ("Unrecognized signal name") for an accessibleNavigation
+  // + legend + animated-Bar-with-no-Line chart.
+  test('does not reference INTERACTION_MODALITY when animatedMarks is a hover-animated Bar, not a Line (focusedDimensionIsLegendColor unset)', () => {
+    const options = { ...defaultLegendOptions, accessibleNavigation: true };
+    const result = getLegendOpacity(options, { animatedMarks: ['bar0'] });
+    expect(Array.isArray(result) && result).toHaveLength(2);
+    expect(JSON.stringify(result)).not.toContain(INTERACTION_MODALITY);
+  });
+});
+
+describe('getOpacityEncoding()', () => {
+  // Regression guard: INTERACTION_MODALITY is only ever registered as a Vega signal by a Line mark
+  // with accessibleNavigation — never by Bar. Referencing it unconditionally here previously made
+  // Vega reject the whole spec ("Unrecognized signal name") for any Bar-only chart with a legend.
+  test('does not reference INTERACTION_MODALITY for the interactive-mark hover rule when no Line has set focusedDimensionIsLegendColor (Bar, or no accessibleNavigation at all)', () => {
+    const result = getOpacityEncoding(defaultLegendOptions, { interactiveMarks: [{ name: 'bar0' }] });
+    expect(Array.isArray(result) && result[0]).toStrictEqual({
+      test: `isValid(bar0_${HOVERED_ITEM})`,
+      signal: `bar0_${HOVERED_ITEM}.${SERIES_ID} === datum.value ? 1 : ${FADE_FACTOR}`,
+    });
+  });
+
+  test('gates the interactive-mark hover rule out while keyboard is the active modality, only when focusedDimensionIsLegendColor confirms INTERACTION_MODALITY is registered (Line)', () => {
+    const result = getOpacityEncoding(defaultLegendOptions, {
+      interactiveMarks: [{ name: 'line0' }],
+      focusedDimensionIsLegendColor: true,
+    });
+    expect(Array.isArray(result) && result[0]).toStrictEqual({
+      test: `${INTERACTION_MODALITY} !== 'keyboard' && isValid(line0_${HOVERED_ITEM})`,
+      signal: `line0_${HOVERED_ITEM}.${SERIES_ID} === datum.value ? 1 : ${FADE_FACTOR}`,
+    });
+  });
+
+  test('adds a focus rule using the suffix convention (Bar) when accessibleNavigation is set without focusedDimensionIsLegendColor', () => {
+    const options = { ...defaultLegendOptions, accessibleNavigation: true };
+    const result = getOpacityEncoding(options, { interactiveMarks: [{ name: 'bar0' }] });
+    expect(Array.isArray(result) && result[1]).toStrictEqual({
+      test: `isValid(${FOCUSED_ITEM})`,
+      signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', 'suffix')}) ? 1 : ${FADE_FACTOR}`,
+    });
+  });
+
+  test('adds a focus rule using the prefix convention (Line) when focusedDimensionIsLegendColor is set', () => {
+    const options = { ...defaultLegendOptions, accessibleNavigation: true };
+    const result = getOpacityEncoding(options, {
+      interactiveMarks: [{ name: 'line0' }],
+      focusedDimensionIsLegendColor: true,
+    });
+    expect(Array.isArray(result) && result[1]).toStrictEqual({
+      test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
+      signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', 'prefix')}) ? 1 : ${FADE_FACTOR}`,
+    });
+  });
+
+  test('does not add a focus rule when accessibleNavigation is unset', () => {
+    const result = getOpacityEncoding(defaultLegendOptions, { interactiveMarks: [{ name: 'line0' }] });
+    expect(Array.isArray(result) && result).toHaveLength(2);
+  });
+
+  test('does not add a focus rule when there are no interactive marks, even with accessibleNavigation set', () => {
+    const options = { ...defaultLegendOptions, accessibleNavigation: true };
+    expect(getOpacityEncoding(options, {})).toBeUndefined();
   });
 });

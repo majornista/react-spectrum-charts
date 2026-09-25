@@ -34,10 +34,13 @@ import {
   DEFAULT_OPACITY_RULE,
   FADE_FACTOR,
   FILTERED_TABLE,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
   GROUP_ID,
   HIGHLIGHTED_GROUP,
   HOVERED_ITEM,
   HOVERED_SERIES,
+  INTERACTION_MODALITY,
   LINE_TYPE_SCALE,
   LINE_WIDTH_SCALE,
   OPACITY_SCALE,
@@ -49,6 +52,7 @@ import {
 } from '@spectrum-charts/constants';
 import { getS2ColorValue, spectrum2Colors } from '@spectrum-charts/themes';
 
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
 import { getPathFromSymbolShape } from '../specUtils';
 import {
   ColorValueV6,
@@ -179,8 +183,24 @@ const getHoverEncodings = (options: LegendSpecOptions, userMeta: UserMeta): Lege
   return {};
 };
 
+/** Whether FOCUSED_DIMENSION is meaningful for this legend's own color domain (Line), or only FOCUSED_ITEM is (Bar). */
+const getAccessibleNavLegendFocusTest = (userMeta: UserMeta): string =>
+  userMeta.focusedDimensionIsLegendColor ? `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})` : `isValid(${FOCUSED_ITEM})`;
+
 export const getLegendOpacity = (options: LegendSpecOptions, userMeta: UserMeta): ProductionRule<NumericValueRef> | undefined => {
   const rules: ProductionRule<NumericValueRef> = [];
+
+  // Keyboard focus wins over the hover-animation ramp below while it's the active modality — a line
+  // or point within it keeps full opacity even though the ramp never reacts to keyboard-driven signals.
+  // INTERACTION_MODALITY is only ever registered by a Line with accessibleNavigation — animatedMarks
+  // alone isn't a safe gate, since a hover-animated Bar also populates it without registering the
+  // signal, which would otherwise crash the whole spec ("Unrecognized signal name") at Vega runtime.
+  if (options.accessibleNavigation && userMeta.focusedDimensionIsLegendColor && userMeta.animatedMarks?.length) {
+    rules.push({
+      test: `${INTERACTION_MODALITY} === 'keyboard' && (${getAccessibleNavLegendFocusTest(userMeta)})`,
+      signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', 'prefix')}) ? 1 : ${FADE_FACTOR}`,
+    });
+  }
 
   for (const markName of userMeta.animatedMarks || []) {
     const isGrouped = !!options.keys?.length;
@@ -220,7 +240,7 @@ const getLegendDescriptionEncoding = (descriptions: LegendDescription[] | undefi
  * @returns opactiy encoding
  */
 export const getOpacityEncoding = (
-  { highlight, highlightedItem, highlightedSeries, keys, chartPopovers, name: legendName }: LegendSpecOptions,
+  { accessibleNavigation, highlight, highlightedItem, highlightedSeries, keys, chartPopovers, name: legendName }: LegendSpecOptions,
   userMeta: UserMeta
 ): ProductionRule<NumericValueRef> | undefined => {
   const highlightSignalName = keys?.length ? HIGHLIGHTED_GROUP : CONTROLLED_HIGHLIGHTED_SERIES;
@@ -253,9 +273,22 @@ export const getOpacityEncoding = (
     });
   }
   for (const { name: markName } of userMeta.interactiveMarks || []) {
+    const hoverTest = `isValid(${markName}_${HOVERED_ITEM})`;
+    // INTERACTION_MODALITY is only ever registered by a Line with accessibleNavigation (never by Bar) —
+    // only reference it when focusedDimensionIsLegendColor guarantees such a Line exists in this chart,
+    // so a Bar-only chart's legend doesn't crash on an undeclared Vega signal.
+    const gatedOutWhileKeyboard = userMeta.focusedDimensionIsLegendColor ? `${INTERACTION_MODALITY} !== 'keyboard' && ${hoverTest}` : hoverTest;
     rules.push({
-      test: `isValid(${markName}_${HOVERED_ITEM})`,
+      test: gatedOutWhileKeyboard,
       signal: `${markName}_${HOVERED_ITEM}.${SERIES_ID} === datum.value ? 1 : ${FADE_FACTOR}`,
+    });
+  }
+  // A focused line/point (Line) or bar/stack (Bar) keeps its legend entry at full opacity, matching the mark's own focus behavior.
+  if (accessibleNavigation && userMeta.interactiveMarks?.length) {
+    const convention = userMeta.focusedDimensionIsLegendColor ? 'prefix' : 'suffix';
+    rules.push({
+      test: getAccessibleNavLegendFocusTest(userMeta),
+      signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', convention)}) ? 1 : ${FADE_FACTOR}`,
     });
   }
 
