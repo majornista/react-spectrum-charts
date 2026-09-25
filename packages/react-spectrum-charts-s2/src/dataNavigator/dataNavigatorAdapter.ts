@@ -367,6 +367,9 @@ type ViewEventHandler = (event: unknown, item: { datum?: Row } | null | undefine
 /** One click-to-focus handler per view, so a re-attach replaces rather than stacks the listener. */
 const clickToFocusHandlers = new WeakMap<View, ViewEventHandler>();
 
+/** One modality-restore handler per view, so a re-attach replaces rather than stacks the listener. */
+const modalityRestoreHandlers = new WeakMap<View, ViewEventHandler>();
+
 /**
  * Real mouse mouseout unconditionally nulls the shared `${markName}_hoveredItem` signals (see
  * `addHoveredItemSignal`), clobbering whatever the keyboard-focused item set. Reapplies that
@@ -838,5 +841,21 @@ export const attachDataNavigator = ({
     };
     view.addEventListener('mousedown', handleMousedown);
     clickToFocusHandlers.set(view, handleMousedown);
+  }
+
+  // Leaving the chart entirely (no item under the pointer) hands the focused look back to whatever
+  // node is still keyboard-focused, rather than leaving interactionModality stuck on 'pointer' from
+  // the last-hovered mark — addInteractionModalitySignal deliberately has no mouseout trigger of its
+  // own (see signalSpecBuilder.ts) since moving between adjacent marks must not reset modality.
+  if (view) {
+    const previous = modalityRestoreHandlers.get(view);
+    if (previous) view.removeEventListener('mouseout', previous);
+    const handleMouseOut: ViewEventHandler = (_event, item) => {
+      if (item) return;
+      applyInteractionModality(view);
+      view.runAsync();
+    };
+    view.addEventListener('mouseout', handleMouseOut);
+    modalityRestoreHandlers.set(view, handleMouseOut);
   }
 };

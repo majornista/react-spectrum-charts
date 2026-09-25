@@ -1376,6 +1376,22 @@ describe('attachDataNavigator()', () => {
       expect(signaledWith('interactionModality', 'keyboard')).toBe(true);
     });
 
+    // addInteractionModalitySignal's own `on:` trigger only ever sets 'pointer' (see signalSpecBuilder.ts),
+    // so nothing else restores 'keyboard' once a real hover has taken over the focused look.
+    test('leaving the chart entirely (no item under the pointer) restores interactionModality to keyboard', () => {
+      enterFirstPoint();
+      signal('interactionModality', 'pointer'); // a real mouseover elsewhere, via the mark's own `on:` trigger
+      fireViewEvent('mouseout', undefined);
+      expect(signal('interactionModality')).toBe('keyboard');
+    });
+
+    test('moving between marks within the chart does not restore interactionModality (item still defined)', () => {
+      enterFirstPoint();
+      signal('interactionModality', 'pointer');
+      fireViewEvent('mouseout', { datum: { datetime: 1, value: 43 } });
+      expect(signal('interactionModality')).toBe('pointer');
+    });
+
     test('does not drive the real hoveredItem signal for a line (unlike Bar hover-parity)', () => {
       enterFirstPoint();
       expect(signal.mock.calls.some(([n]) => n === 'line0_hoveredItem')).toBe(false);
