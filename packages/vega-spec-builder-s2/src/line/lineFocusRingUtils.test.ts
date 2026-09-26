@@ -15,6 +15,7 @@ import {
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
   FOCUSED_REGION,
+  INTERACTION_MODALITY,
   NAVIGATION_ID_SEPARATOR,
   NAVIGATION_INDEX_FIELD,
   SINGLE_LINE_NODE_ID,
@@ -43,7 +44,7 @@ describe('getLineFocusRingOuter()', () => {
     expect(ring.from).toEqual({ data: 'line0_facet' });
     expect(ring.interactive).toBe(false);
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${FOCUSED_DIMENSION} === datum.series`, value: 12 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === datum.series)`, value: 12 },
       { value: 0 },
     ]);
   });
@@ -53,7 +54,7 @@ describe('getLineFocusRingOuter()', () => {
   test('keys a single-series (static color) line on the fixed single-line division id, not a color field', () => {
     const ring = getLineFocusRingOuter(singleLineOptions, 'line0_facet');
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}'`, value: 12 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}')`, value: 12 },
       { value: 0 },
     ]);
   });
@@ -66,7 +67,7 @@ describe('getLineFocusRingGap()', () => {
     expect(ring.from).toEqual({ data: 'line0_facet' });
     expect(ring.encode?.enter?.stroke).toEqual({ signal: BACKGROUND_COLOR });
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${FOCUSED_DIMENSION} === datum.series`, value: 8 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === datum.series)`, value: 8 },
       { value: 0 },
     ]);
   });
@@ -74,7 +75,7 @@ describe('getLineFocusRingGap()', () => {
   test('keys a single-series (static color) line on the fixed single-line division id, not a color field', () => {
     const ring = getLineFocusRingGap(singleLineOptions, 'line0_facet');
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}'`, value: 8 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}')`, value: 8 },
       { value: 0 },
     ]);
   });
@@ -108,7 +109,7 @@ describe('getPointFocusRing()', () => {
     const ring = getPointFocusRing(defaultLineOptions);
     expect(ring.encode?.update?.opacity).toEqual([
       {
-        test: `${FOCUSED_ITEM} === datum.series + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`,
+        test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === datum.series + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`,
         value: 1,
       },
       { value: 0 },
@@ -118,7 +119,7 @@ describe('getPointFocusRing()', () => {
   test('keys a single-line chart on the per-line index only', () => {
     const ring = getPointFocusRing(singleLineOptions);
     expect(ring.encode?.update?.opacity).toEqual([
-      { test: `${FOCUSED_ITEM} === '' + datum.${NAVIGATION_INDEX_FIELD}`, value: 1 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === '' + datum.${NAVIGATION_INDEX_FIELD}`, value: 1 },
       { value: 0 },
     ]);
   });

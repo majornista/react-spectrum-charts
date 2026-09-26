@@ -16,6 +16,7 @@ import {
   FILTERED_TABLE,
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
+  INTERACTION_MODALITY,
   NAVIGATION_ID_SEPARATOR,
   NAVIGATION_INDEX_FIELD,
   SINGLE_LINE_NODE_ID,
@@ -40,9 +41,12 @@ const getLineFocusRingStrokeWidth = (
 ): ProductionRule<NumericValueRef> => {
   // A single-series line has no per-datum color value to key on — match the fixed single-line
   // division id its structure builder uses instead (see SINGLE_LINE_NODE_ID).
-  const test = typeof color === 'string' ? `${FOCUSED_DIMENSION} === datum.${color}` : `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}'`;
+  const isFocused = typeof color === 'string' ? `${FOCUSED_DIMENSION} === datum.${color}` : `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}'`;
+  // A real mouse hover elsewhere already dims this line to the same reduced opacity as every other
+  // non-hovered line (see lineDataUtils.ts/lineMarkUtils.ts); showing the ring at full strength over
+  // a dimmed line reads as broken, so hide it too until interactionModality reverts to 'keyboard'.
   return [
-    { test, value: width },
+    { test: `${INTERACTION_MODALITY} === 'keyboard' && (${isFocused})`, value: width },
     { value: 0 },
   ];
 };
@@ -145,7 +149,9 @@ export const getPointFocusRing = (options: LineSpecOptions): SymbolMark => {
       },
       update: {
         x: getXProductionRule(scaleType, dimension),
-        opacity: [{ test: `${FOCUSED_ITEM} === ${focusedItemId}`, value: 1 }, { value: 0 }],
+        // Same reasoning as getLineFocusRingStrokeWidth: hide the ring while a real hover elsewhere
+        // has dimmed this point, rather than showing it at full opacity over a dimmed target.
+        opacity: [{ test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === ${focusedItemId}`, value: 1 }, { value: 0 }],
       },
     },
   };
