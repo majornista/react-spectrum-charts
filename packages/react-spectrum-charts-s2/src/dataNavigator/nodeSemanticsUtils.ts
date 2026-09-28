@@ -9,13 +9,13 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
+import { NodeObject, Structure } from 'data-navigator';
 
-import { Bar } from '../components/Bar';
-import { Line } from '../components/Line';
-import { NavigableChartType } from './buildChartStructure';
-
-export const getNavigableChartType = (displayName: unknown): NavigableChartType | undefined => {
-  if (displayName === Bar.displayName) return 'bar';
-  if (displayName === Line.displayName) return 'line';
-  return undefined;
+/** Every node rendered in keyboard mode needs an aria-label — shared by every chart type's structure builder. */
+export const applyDefaultLabels = (structure: Structure, labelFor: (node: NodeObject) => string): void => {
+  for (const node of Object.values(structure.nodes)) {
+    if (!node.semantics?.label) {
+      node.semantics = { ...node.semantics, label: labelFor(node) };
+    }
+  }
 };

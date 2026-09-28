@@ -19,7 +19,10 @@ import {
   DEFAULT_STROKE_WIDTH_RULE,
   DEFAULT_TRANSFORMED_TIME_DIMENSION,
   FADE_FACTOR,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
   HOVERED_ITEM,
+  INTERACTION_MODALITY,
   LINE_TYPE_SCALE,
   OPACITY_SCALE,
   SELECTED_SERIES,
@@ -27,6 +30,7 @@ import {
 } from '@spectrum-charts/constants';
 
 import { getLineDrawInXEncoding, getLineDrawInYEncoding } from '../marks/drawInAnimationUtils';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
 import { getDeemphasisRamp, getHoverFractionSignal } from '../marks/hoverAnimationUtils';
 import {
   getAlternateSegmentStrokeDash,
@@ -293,6 +297,37 @@ describe('getLineOpacity()', () => {
       });
       expect(opacityRule).toEqual([DEFAULT_OPACITY_RULE]);
     });
+
+    test('with accessibleNavigation, adds an unanimated focus rule ahead of the deemphasis ramp', () => {
+      const opacityRule = getLineOpacity({
+        ...defaultLineMarkOptions,
+        interactiveMarkName: 'line0',
+        isHoverAnimate: true,
+        accessibleNavigation: true,
+      });
+      const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${defaultLineMarkOptions.color}`, 'prefix');
+      expect(opacityRule).toStrictEqual([
+        {
+          test: `${INTERACTION_MODALITY} === 'keyboard' && (isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM}))`,
+          signal: `(${focusMatchExpr}) ? 1 : ${FADE_FACTOR}`,
+        },
+        getLineDeemphasisOpacitySignal('line0'),
+      ]);
+    });
+  });
+
+  test('with accessibleNavigation (not animated), adds a trailing focus opacity rule', () => {
+    const opacityRule = getLineOpacity({
+      ...defaultLineMarkOptions,
+      interactiveMarkName: 'line0',
+      accessibleNavigation: true,
+    }) as { test?: string; signal?: string }[];
+    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${defaultLineMarkOptions.color}`, 'prefix');
+    expect(opacityRule.at(-2)).toStrictEqual({
+      test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
+      signal: `(${focusMatchExpr}) ? 1 : ${FADE_FACTOR}`,
+    });
+    expect(opacityRule.at(-1)).toStrictEqual(DEFAULT_OPACITY_RULE);
   });
 });
 
@@ -394,6 +429,25 @@ describe('getLineStrokeWidth()', () => {
       test: `isValid(line1_${HOVERED_ITEM})`,
       signal: CHART_SIZE_STROKE_WIDTH,
     });
+  });
+
+  test('with accessibleNavigation, gates the hover rule on interaction modality and adds a trailing focus rule', () => {
+    const result = getLineStrokeWidth({
+      ...defaultLineMarkOptions,
+      interactiveMarkName: 'line0',
+      chartInspects: [{}],
+      accessibleNavigation: true,
+    }) as { test?: string; signal?: string }[];
+    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${defaultLineMarkOptions.color}`, 'prefix');
+    expect(result[0]).toStrictEqual({
+      test: `isValid(line0_${HOVERED_ITEM}) && ${INTERACTION_MODALITY} !== 'keyboard'`,
+      signal: `line0_${HOVERED_ITEM}.${SERIES_ID} === datum.${SERIES_ID} ? ${CHART_SIZE_HOVER_STROKE_WIDTH} : ${CHART_SIZE_STROKE_WIDTH}`,
+    });
+    expect(result.at(-2)).toStrictEqual({
+      test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
+      signal: `(${focusMatchExpr}) ? ${CHART_SIZE_HOVER_STROKE_WIDTH} : ${CHART_SIZE_STROKE_WIDTH}`,
+    });
+    expect(result.at(-1)).toStrictEqual(DEFAULT_STROKE_WIDTH_RULE);
   });
 });
 

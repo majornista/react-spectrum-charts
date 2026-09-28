@@ -22,13 +22,18 @@ import {
   DEFAULT_TIME_DIMENSION,
   DEFAULT_TRANSFORMED_TIME_DIMENSION,
   FILTERED_TABLE,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
+  FOCUSED_REGION,
   GROUP_ID,
   HOVERED_ITEM,
   HOVER_ANIM_LAST_CHANGE_DATA,
   HOVER_TARGETS,
   ANIMATION_TIMER,
+  INTERACTION_MODALITY,
   LINEAR_PADDING,
   MARK_ID,
+  NAVIGATION_INDEX_FIELD,
   SERIES_ID,
   TABLE,
   TRENDLINE_VALUE,
@@ -38,7 +43,15 @@ import * as signalSpecBuilder from '../signal/signalSpecBuilder';
 import { defaultSignals } from '../specTestUtils';
 import { initializeSpec } from '../specUtils';
 import { ScSpec } from '../types';
-import { addData, addLine, addLineMarks, addSignals, getAlternateSegmentData, setScales } from './lineSpecBuilder';
+import {
+  addData,
+  addLine,
+  addLineMarks,
+  addSignals,
+  getAlternateSegmentData,
+  getNavIndexSignalName,
+  setScales,
+} from './lineSpecBuilder';
 import { defaultLineOptions } from './lineTestUtils';
 
 const startingSpec: ScSpec = initializeSpec({
@@ -527,6 +540,60 @@ describe('lineSpecBuilder', () => {
         expect(spec.data?.some((d) => d.name === 'line0_drawInLerp')).toBe(false);
       });
     });
+
+    describe('accessibleNavigation', () => {
+      test('falls back interactiveMarkName to the line name when nothing else already produced one', () => {
+        const spec = addLine(startingSpec, {
+          idKey: MARK_ID,
+          color: DEFAULT_COLOR,
+          markType: 'line',
+          accessibleNavigation: true,
+        });
+        const voronoiPathMark = spec.marks?.at(-1);
+        expect(voronoiPathMark?.description).toBe('line0_voronoi');
+      });
+
+      test('without accessibleNavigation and no other interactive feature, interactiveMarkName stays undefined', () => {
+        const spec = addLine(startingSpec, { idKey: MARK_ID, color: DEFAULT_COLOR, markType: 'line' });
+        const voronoiPathMark = spec.marks?.at(-1);
+        expect(voronoiPathMark?.description).not.toBe('line0_voronoi');
+      });
+
+      test('adds the chart focus ring mark and focus signals to the built spec', () => {
+        const spec = addLine(startingSpec, {
+          idKey: MARK_ID,
+          color: DEFAULT_COLOR,
+          markType: 'line',
+          accessibleNavigation: true,
+        });
+        expect(spec.marks?.find((m) => m.name === 'chartFocusRing')).toBeDefined();
+        expect(spec.signals?.some((s) => s.name === FOCUSED_ITEM)).toBe(true);
+      });
+
+      test('with a string color, tells the legend that FOCUSED_DIMENSION shares its color domain', () => {
+        const spec = addLine(startingSpec, {
+          idKey: MARK_ID,
+          color: DEFAULT_COLOR,
+          markType: 'line',
+          accessibleNavigation: true,
+        });
+        expect(spec.usermeta?.focusedDimensionIsLegendColor).toBe(true);
+      });
+
+      test('without a string color, does not set the legend focus-domain flag', () => {
+        const spec = addLine(startingSpec, {
+          idKey: MARK_ID,
+          markType: 'line',
+          accessibleNavigation: true,
+        });
+        expect(spec.usermeta?.focusedDimensionIsLegendColor).toBeUndefined();
+      });
+
+      test('without accessibleNavigation, does not set the legend focus-domain flag even with a string color', () => {
+        const spec = addLine(startingSpec, { idKey: MARK_ID, color: DEFAULT_COLOR, markType: 'line' });
+        expect(spec.usermeta?.focusedDimensionIsLegendColor).toBeUndefined();
+      });
+    });
   });
 
   describe('addData()', () => {
@@ -793,6 +860,29 @@ describe('lineSpecBuilder', () => {
         expect(resultData.find((d) => d.name === 'line0_drawInTip')).toBeUndefined();
         expect(resultData.find((d) => d.name === 'line0_drawInLerp')).toBeUndefined();
         expect(resultData.find((d) => d.name === 'line0_drawInIndexed')).toBeUndefined();
+      });
+    });
+
+    describe('accessibleNavigation', () => {
+      test('adds a NAVIGATION_INDEX_FIELD formula transform sourced from the nav-index-by-markId signal', () => {
+        const resultData = addData(baseData, { ...defaultLineOptions, accessibleNavigation: true });
+        const tableData = resultData.find((d) => d.name === TABLE);
+        expect(tableData?.transform).toContainEqual({
+          type: 'formula',
+          as: NAVIGATION_INDEX_FIELD,
+          expr: `${getNavIndexSignalName('line0')}[datum.${MARK_ID}]`,
+        });
+      });
+
+      test('does not add the transform when accessibleNavigation is false', () => {
+        const resultData = addData(baseData, defaultLineOptions);
+        const tableData = resultData.find((d) => d.name === TABLE);
+        expect(tableData?.transform?.some((t) => 'as' in t && t.as === NAVIGATION_INDEX_FIELD)).toBe(false);
+      });
+
+      test('registers the highlighted-data source even when the line is not otherwise interactive', () => {
+        const resultData = addData(baseData, { ...defaultLineOptions, accessibleNavigation: true });
+        expect(resultData.find((d) => d.name === 'line0_highlightedData')).toBeDefined();
       });
     });
   });
@@ -1247,6 +1337,54 @@ describe('lineSpecBuilder', () => {
       expect(Array.isArray(yEncoding)).toBe(true);
       expect(yEncoding?.[0]).toHaveProperty('field', 'line0_effectiveValue');
     });
+
+    describe('accessibleNavigation', () => {
+      test('with a string color, inserts the two-layer focus halo before the line mark and a zindex encoding on the group', () => {
+        const marks = addLineMarks([], { ...defaultLineOptions, accessibleNavigation: true });
+        const groupMark = marks.find((m) => m.name === 'line0_group') as {
+          encode?: { update?: { zindex?: unknown } };
+          marks: { name: string }[];
+        };
+        expect(groupMark.encode?.update?.zindex).toBeDefined();
+        expect(groupMark.marks.map((m) => m.name)).toStrictEqual(['line0_focusRingOuter', 'line0_focusRingGap', 'line0']);
+      });
+
+      // A single-series line has a static { value } color (this is also the default when no color
+      // prop is given at all — ColorFacet is only ever a field-reference string or a static value,
+      // never an array) — it still gets the halo, keyed on the fixed single-line id instead of a
+      // per-datum color field. Regression: this previously fell into a "no ring at all" bucket.
+      test('with a static (non-string) color — single-series — still inserts the two-layer focus halo and a zindex encoding on the group', () => {
+        const marks = addLineMarks([], {
+          ...defaultLineOptions,
+          accessibleNavigation: true,
+          color: { value: 'categorical-100' },
+        });
+        const groupMark = marks.find((m) => m.name === 'line0_group') as {
+          encode?: { update?: { zindex?: unknown } };
+          marks: { name: string }[];
+        };
+        expect(groupMark.encode?.update?.zindex).toBeDefined();
+        expect(groupMark.marks.map((m) => m.name)).toStrictEqual(['line0_focusRingOuter', 'line0_focusRingGap', 'line0']);
+      });
+
+      test('adds the point focus ring and the chart focus ring', () => {
+        const marks = addLineMarks([], { ...defaultLineOptions, accessibleNavigation: true });
+        expect(marks.find((m) => m.name === 'line0_pointFocusRing')).toBeDefined();
+        expect(marks.find((m) => m.name === 'chartFocusRing')).toBeDefined();
+      });
+
+      test('without accessibleNavigation, adds neither the point focus ring nor the chart focus ring', () => {
+        const marks = addLineMarks([], defaultLineOptions);
+        expect(marks.find((m) => m.name === 'line0_pointFocusRing')).toBeUndefined();
+        expect(marks.find((m) => m.name === 'chartFocusRing')).toBeUndefined();
+      });
+
+      test('registers interactive hover marks even when the line is not otherwise interactive', () => {
+        const marks = addLineMarks([], { ...defaultLineOptions, accessibleNavigation: true });
+        const voronoiPathMark = marks.at(-1);
+        expect(voronoiPathMark?.description).toBe('line0_voronoi');
+      });
+    });
   });
 
   describe('addSignals()', () => {
@@ -1344,6 +1482,36 @@ describe('lineSpecBuilder', () => {
         const signals = addSignals([], { ...defaultLineOptions, isDrawInAnimate: false });
         expect(signals.some((s) => s.name === 'drawInStart')).toBe(false);
         expect(signals.some((s) => s.name === 'line0_drawInAnimCutoff')).toBe(false);
+      });
+    });
+
+    describe('accessibleNavigation', () => {
+      test('adds the focus signals and the nav-index-by-markId lookup signal', () => {
+        const signals = addSignals([], {
+          ...defaultLineOptions,
+          accessibleNavigation: true,
+          data: [{ series: 'a' }, { series: 'a' }, { series: 'b' }],
+        });
+        expect(signals.some((s) => s.name === FOCUSED_ITEM)).toBe(true);
+        expect(signals.some((s) => s.name === FOCUSED_REGION)).toBe(true);
+        expect(signals.some((s) => s.name === FOCUSED_DIMENSION)).toBe(true);
+
+        const navSignal = signals.find((s) => s.name === getNavIndexSignalName('line0')) as
+          | { value?: unknown }
+          | undefined;
+        expect(navSignal?.value).toStrictEqual({ 1: 1, 2: 2, 3: 1 });
+      });
+
+      test('registers hover and interactionModality signals even when not otherwise interactive', () => {
+        const signals = addSignals([], { ...defaultLineOptions, accessibleNavigation: true });
+        expect(signals.some((s) => s.name === `line0_${HOVERED_ITEM}`)).toBe(true);
+        expect(signals.some((s) => s.name === INTERACTION_MODALITY)).toBe(true);
+      });
+
+      test('does not add focus/interactionModality signals when accessibleNavigation is false', () => {
+        const signals = addSignals([], defaultLineOptions);
+        expect(signals.some((s) => s.name === FOCUSED_ITEM)).toBe(false);
+        expect(signals.some((s) => s.name === INTERACTION_MODALITY)).toBe(false);
       });
     });
   });

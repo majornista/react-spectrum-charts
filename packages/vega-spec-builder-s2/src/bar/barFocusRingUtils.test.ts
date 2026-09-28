@@ -9,10 +9,10 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { FOCUSED_DIMENSION, FOCUSED_REGION, NAVIGATION_ID_SEPARATOR, SELECTED_ITEM } from '@spectrum-charts/constants';
+import { FOCUSED_DIMENSION, NAVIGATION_ID_SEPARATOR, SELECTED_ITEM } from '@spectrum-charts/constants';
 
 import { defaultBarOptions, defaultBarOptionsWithSecondayColor } from './barTestUtils';
-import { getBarFocusRing, getChartFocusRing, getDodgedGroupFocusRing, getStackFocusRing } from './barFocusRingUtils';
+import { getBarFocusRing, getDodgedGroupFocusRing, getStackFocusRing } from './barFocusRingUtils';
 
 const { dimension, metric } = defaultBarOptions;
 
@@ -55,19 +55,6 @@ describe('getBarFocusRing()', () => {
   test('suppresses opacity whenever any item is selected/popover-open', () => {
     const opacity = JSON.stringify(getBarFocusRing(defaultBarOptions).encode?.update?.opacity);
     expect(opacity).toContain(`isValid(${SELECTED_ITEM})`);
-  });
-});
-
-describe('getChartFocusRing()', () => {
-  test('covers the full plot area and keys opacity on the chart region', () => {
-    const ring = getChartFocusRing(defaultBarOptions);
-    expect(ring).toHaveProperty('name', 'chartFocusRing');
-    expect(ring.encode?.update?.x).toEqual({ value: 0 });
-    expect(ring.encode?.update?.x2).toEqual({ signal: 'width' });
-    expect(ring.encode?.update?.opacity).toEqual([
-      { test: `${FOCUSED_REGION} === 'chart'`, value: 1 },
-      { value: 0 },
-    ]);
   });
 });
 
