@@ -39,6 +39,10 @@ export interface NavigatorProps {
   order?: string;
   /** Chart orientation. Swaps which arrow keys move between stacks vs. within a stack. Defaults to vertical. */
   orientation?: Orientation;
+  /** Line-only: whether the dimension field is time-scaled; formats it as a date in accessible labels. */
+  isTimeDimension?: boolean;
+  /** Line-only: the line's x-scale type, used to resolve a focused point's rendered position for popover/tooltip anchoring. */
+  scaleType?: string;
   /** Maps a data field to its axis/legend title — drives the focused leaf's accessible name and a clean focus tooltip for bars without a ChartInspect. */
   fieldLabels?: Record<string, string>;
   /** Per-series metric-axis titles for dual-metric-axis bars. */
@@ -80,6 +84,8 @@ export const Navigator = ({
   metric,
   order,
   orientation,
+  isTimeDimension,
+  scaleType,
   fieldLabels,
   metricTitleBySeries,
   hasChartInspect,
@@ -114,6 +120,8 @@ export const Navigator = ({
         metric,
         order,
         orientation,
+        isTimeDimension,
+        scaleType,
         fieldLabels,
         metricTitleBySeries,
         hasChartInspect,
@@ -154,6 +162,8 @@ export const Navigator = ({
     metric,
     order,
     orientation,
+    isTimeDimension,
+    scaleType,
     fieldLabels,
     metricTitleBySeries,
     hasChartInspect,

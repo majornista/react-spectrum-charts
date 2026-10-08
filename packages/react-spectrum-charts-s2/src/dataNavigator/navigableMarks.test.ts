@@ -9,13 +9,24 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-
 import { Bar } from '../components/Bar';
 import { Line } from '../components/Line';
-import { NavigableChartType } from './buildChartStructure';
+import { getNavigableChartType } from './navigableMarks';
 
-export const getNavigableChartType = (displayName: unknown): NavigableChartType | undefined => {
-  if (displayName === Bar.displayName) return 'bar';
-  if (displayName === Line.displayName) return 'line';
-  return undefined;
-};
+describe('getNavigableChartType()', () => {
+  test('recognizes Bar', () => {
+    expect(getNavigableChartType(Bar.displayName)).toBe('bar');
+  });
+
+  test('recognizes Line', () => {
+    expect(getNavigableChartType(Line.displayName)).toBe('line');
+  });
+
+  test('returns undefined for an unrecognized mark', () => {
+    expect(getNavigableChartType('Area')).toBeUndefined();
+  });
+
+  test('returns undefined for a non-string displayName', () => {
+    expect(getNavigableChartType(undefined)).toBeUndefined();
+  });
+});

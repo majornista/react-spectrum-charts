@@ -15,9 +15,13 @@ import {
   COLOR_SCALE,
   FILTERED_TABLE,
   FIRST_RSC_SERIES_ID,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
+  FOCUSED_REGION,
   GROUP_ID,
   HOVERED_ITEM,
   HOVERED_SERIES,
+  INTERACTION_MODALITY,
   LAST_RSC_SERIES_ID,
 } from '@spectrum-charts/constants';
 
@@ -128,6 +132,36 @@ export const getLastRscSeriesIdSignal = (): Signal => ({
   value: null,
   update: `length(domain("${COLOR_SCALE}")) > 0 ? peek(domain("${COLOR_SCALE}")) : null`,
 });
+
+/**
+ * Registers the chart-wide keyboard-navigation focus signals (FOCUSED_ITEM/REGION/DIMENSION), guarded
+ * so a chart with more than one accessibly-navigable mark doesn't produce duplicate Vega signal declarations.
+ */
+export const addFocusSignals = (signals: Signal[]): void => {
+  if (hasSignalByName(signals, FOCUSED_ITEM)) return;
+  signals.push(getGenericValueSignal(FOCUSED_ITEM), getGenericValueSignal(FOCUSED_REGION), getGenericValueSignal(FOCUSED_DIMENSION));
+};
+
+/**
+ * Registers the interactionModality signal ('pointer' | 'keyboard' | null), which lets a mark's own
+ * opacity/highlight logic defer to whichever input method last drove focus. Keyboard navigation sets
+ * this directly via the view (see dataNavigatorAdapter.ts); this only wires the real-mouse side.
+ */
+export const addInteractionModalitySignal = (signals: Signal[], targetName: string): void => {
+  let signal = signals.find((signal) => signal.name === INTERACTION_MODALITY);
+  if (!signal) {
+    signal = {
+      description: 'Tracks whether pointer or keyboard was most recently used to drive focus/hover.',
+      name: INTERACTION_MODALITY,
+      value: null,
+      on: [],
+    };
+    signals.push(signal);
+  }
+  signal.on = signal.on ?? [];
+  // No mouseout trigger: moving from one interactive mark to another must not reset modality.
+  signal.on.push({ events: `@${targetName}:mouseover`, update: "'pointer'" });
+};
 
 export const addHoveredItemSignal = (
   signals: Signal[],
