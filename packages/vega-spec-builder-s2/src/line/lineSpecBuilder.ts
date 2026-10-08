@@ -128,6 +128,7 @@ export const addLine = produce<
     {
       animations,
       animationTypes,
+      chartActionBars = [],
       chartPopovers = [],
       chartInspects = [],
       color = { value: 'categorical-100' },
@@ -170,6 +171,7 @@ export const addLine = produce<
 
     // put options back together now that all defaults are set
     const lineOptions: LineSpecOptions = {
+      chartActionBars,
       chartPopovers,
       chartInspects,
       color,
@@ -187,6 +189,7 @@ export const addLine = produce<
       interactiveMarkName:
         getInteractiveMarkName(
           {
+            chartActionBars,
             chartPopovers,
             chartInspects,
             hasOnClick,
@@ -203,7 +206,7 @@ export const addLine = produce<
       metricRanges,
       name: lineName,
       opacity,
-      popoverMarkName: getPopoverMarkName(chartPopovers, lineName),
+      popoverMarkName: getPopoverMarkName(chartPopovers, lineName, chartActionBars),
       scaleType,
       trendlines,
       interpolate,
