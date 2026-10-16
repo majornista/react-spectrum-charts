@@ -9,9 +9,9 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { Bar } from '../components/Bar';
-import { Line } from '../components/Line';
-import { getNavigableChartType } from './navigableMarks';
+import { Bar } from '../components/Bar/index.js';
+import { Line } from '../components/Line/index.js';
+import { getNavigableChartType } from './navigableMarks.js';
 
 describe('getNavigableChartType()', () => {
   test('recognizes Bar', () => {

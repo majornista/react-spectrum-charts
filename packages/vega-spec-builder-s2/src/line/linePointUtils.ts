@@ -19,17 +19,17 @@ import {
   FADE_FACTOR,
   HOVERED_ITEM,
   SERIES_ID,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 
 import {
   getColorProductionRule,
   getXProductionRule,
-} from '../marks/markUtils';
-import { LineSpecOptions } from '../types';
-import { getLineYEncoding, getLineDeemphasisOpacitySignal } from './lineMarkUtils';
-import { LineMarkOptions } from './lineUtils';
+} from '../marks/markUtils.js';
+import { LineSpecOptions } from '../types/index.js';
+import { getLineDeemphasisOpacitySignal, getLineYEncoding } from './lineEncodingUtils.js';
+import { LineMarkOptions } from './lineUtils.js';
 
-const getPointSizeEncoding = (pointSize: number | undefined) =>
+export const getPointSizeEncoding = (pointSize: number | undefined) =>
   pointSize === undefined ? { signal: CHART_SIZE_POINT_SIZE } : { value: pointSize };
 
 /**

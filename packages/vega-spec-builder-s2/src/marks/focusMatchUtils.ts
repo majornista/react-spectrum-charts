@@ -9,7 +9,7 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { FOCUSED_DIMENSION, FOCUSED_ITEM, NAVIGATION_ID_SEPARATOR } from '@spectrum-charts/constants';
+import { FOCUSED_DIMENSION, FOCUSED_ITEM, NAVIGATION_ID_SEPARATOR } from '@spectrum-charts/core-s2/constants';
 
 /** Which half of the focused item's composite id (`segmentId(a, b)` = `a+SEP+b`) `matchExpr` should be checked against: Line's leaf scheme keys by the leading value (color), Bar's keys by the trailing value (color). */
 export type FocusMatchConvention = 'prefix' | 'suffix';

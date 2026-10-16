@@ -45,12 +45,12 @@ import {
   SERIES_ID,
   STACK_ID,
   TABLE,
-} from '@spectrum-charts/constants';
-import { spectrum2Colors } from '@spectrum-charts/themes';
+} from '@spectrum-charts/core-s2/constants';
+import { spectrum2Colors } from '@spectrum-charts/core-s2/tokens';
 
-import { defaultSignals } from '../specTestUtils';
-import { baseData, initializeSpec } from '../specUtils';
-import { ScSpec } from '../types/specUtil.types';
+import { defaultSignals } from '../specTestUtils.js';
+import { baseData, initializeSpec } from '../specUtils.js';
+import { ScSpec } from '../types/specUtil.types.js';
 import {
   addBar,
   addData,
@@ -63,15 +63,15 @@ import {
   getRepeatedScale,
   getStackAggregateData,
   getStackIdTransform,
-} from './barSpecBuilder';
+} from './barSpecBuilder.js';
 import {
   defaultBarOptions,
   defaultBarOptionsWithSecondayColor,
   defaultBarStrokeEncodings,
   defaultCornerRadiusEncodings,
   defaultStackedYEncodings,
-} from './barTestUtils';
-import { defaultDodgedMark } from './dodgedBarUtils.test';
+} from './barTestUtils.js';
+import { defaultDodgedMark } from './dodgedBarUtils.test.js';
 
 const startingSpec = initializeSpec({
   scales: [{ name: COLOR_SCALE, type: 'ordinal' }],
@@ -1112,6 +1112,13 @@ describe('barSpecBuilder', () => {
         expect(marks.find((mark) => mark.name === 'chartFocusRing')).toBeDefined();
         expect(marks.find((mark) => mark.name === 'bar0_focusRing')).toBeDefined();
       });
+      test('adds a segment ring inside a dodged-and-stacked group and a group ring beside it', () => {
+        const marks = addMarks([], { ...defaultBarOptionsWithSecondayColor, accessibleNavigation: true });
+        const group = marks.find((mark) => mark.name === 'bar0_group') as GroupMark;
+        expect(group.marks?.find((mark) => mark.name === 'bar0_focusRing')).toBeDefined();
+        expect(marks.find((mark) => mark.name === 'bar0_stackFocusRing')).toHaveProperty('from', { data: 'bar0_groups' });
+      });
+
       test('should add the bar focus ring inside the dodge group when enabled (dodged bar)', () => {
         const marks = addMarks([], { ...defaultBarOptions, type: 'dodged', accessibleNavigation: true });
         const group = marks.find((mark) => mark.name === 'bar0_group') as GroupMark;
@@ -1399,7 +1406,7 @@ describe('barSpecBuilder', () => {
             {
               type: 'aggregate',
               groupby: [DEFAULT_CATEGORICAL_DIMENSION],
-              fields: [DEFAULT_METRIC, DEFAULT_METRIC],
+              fields: [`${DEFAULT_METRIC}1`, `${DEFAULT_METRIC}1`],
               ops: ['min', 'max'],
             },
           ],
@@ -1454,7 +1461,7 @@ describe('barSpecBuilder', () => {
             {
               type: 'aggregate',
               groupby: [DEFAULT_CATEGORICAL_DIMENSION],
-              fields: [DEFAULT_METRIC, DEFAULT_METRIC],
+              fields: [`${DEFAULT_METRIC}1`, `${DEFAULT_METRIC}1`],
               ops: ['min', 'max'],
             },
           ],

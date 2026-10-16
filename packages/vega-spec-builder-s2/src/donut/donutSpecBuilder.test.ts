@@ -9,14 +9,202 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { COLOR_SCALE, FILTERED_TABLE, HOVERED_ITEM } from '@spectrum-charts/constants';
+import { View, expressionFunction, parse } from 'vega';
 
-import { defaultSignals } from '../specTestUtils';
-import { initializeSpec } from '../specUtils';
-import { addData, addDonut, addMarks, addScales, addSignals } from './donutSpecBuilder';
-import { defaultDonutOptions } from './donutTestUtils';
+import {
+  COLOR_SCALE,
+  DONUT_LABEL_COLLISION_GAP,
+  DONUT_LABEL_MIN_SPACE_RATIO,
+  FILTERED_TABLE,
+  HOVERED_ITEM,
+  MARK_ID,
+  TABLE,
+} from '@spectrum-charts/core-s2/constants';
+
+import { buildSpec } from '../chartSpecBuilder.js';
+import { getExpressionFunctions } from '../expressionFunctions/index.js';
+import { defaultSignals } from '../specTestUtils.js';
+import { initializeSpec } from '../specUtils.js';
+import { addData, addDonut, addMarks, addScales, addSignals } from './donutSpecBuilder.js';
+import { defaultDonutOptions } from './donutTestUtils.js';
 
 describe('addData', () => {
+  test('positions direct-label data coordinates from the fixed circle start', async () => {
+    Object.entries(getExpressionFunctions('en-US')).forEach(([name, fn]) => expressionFunction(name, fn));
+    expressionFunction('rscContainerWidth', (width: number) => width);
+    const data = [
+      { series: 'Chrome', value: 10390 },
+      { series: 'Firefox', value: 8281 },
+      { series: 'Safari', value: 7045 },
+      { series: 'Opera', value: 6166 },
+      { series: 'Other', value: 4201 },
+      { series: 'Brave', value: 3261 },
+      { series: 'Unknown', value: 1021 },
+    ];
+    const getLabelData = async () => {
+      const spec = buildSpec({
+        data,
+        marks: [
+          {
+            markType: 'donut',
+            color: 'series',
+            metric: 'value',
+            name: 'testDonut',
+            segmentLabels: [{ value: true }],
+          },
+        ],
+      });
+      const table = spec.data?.find(({ name }) => name === TABLE);
+      if (!table || !('values' in table)) throw new Error('Expected inline table data');
+      table.values = data;
+      const view = new View(parse(spec), { renderer: 'none' }).width(400).height(400);
+      await view.runAsync();
+      return view.data('testDonut_segmentLabelData');
+    };
+    const labels = await getLabelData();
+    expect(labels.length).toBeGreaterThan(0);
+
+    labels.forEach((datum) => {
+      expect(datum.testDonut_segmentLabel_labelY).toBeCloseTo(datum.testDonut_segmentLabel_idealY);
+      expect(datum.testDonut_arcTheta).toBeGreaterThan(0);
+      expect(datum.testDonut_arcTheta).toBeLessThan(2 * Math.PI);
+    });
+  });
+
+  test.each([
+    ['direct', { value: true }],
+    ['advanced', { percent: true, showValueRow: true, swatch: true, value: false }],
+  ])('keeps dense %s labels fixed and hides only overlapping candidates', async (_mode, label) => {
+    Object.entries(getExpressionFunctions('en-US')).forEach(([name, fn]) => expressionFunction(name, fn));
+    expressionFunction('rscContainerWidth', (width: number) => width);
+    const data = Array.from({ length: 24 }, (_, index) => ({
+      series: `Category ${String(index + 1).padStart(2, '0')}`,
+      value: 25 - index,
+    }));
+    const spec = buildSpec({
+      data,
+      marks: [
+        {
+          markType: 'donut',
+          color: 'series',
+          metric: 'value',
+          name: 'denseDonut',
+          segmentLabels: [label],
+        },
+      ],
+    });
+    const table = spec.data?.find(({ name }) => name === TABLE);
+    if (!table || !('values' in table)) throw new Error('Expected inline table data');
+    table.values = data;
+    const view = new View(parse(spec), { renderer: 'none' }).width(364).height(364);
+    await view.runAsync();
+    const prefix = _mode === 'advanced' ? 'denseDonut_richSegmentLabel' : 'denseDonut_segmentLabel';
+    const candidates = view.data(`${prefix}Candidates`);
+    const labels = view.data(`${prefix}Data`);
+    expect(labels.length).toBeGreaterThan(0);
+    expect(labels.length).toBeLessThanOrEqual(candidates.length);
+    labels.forEach((datum) => {
+      expect(datum[`${prefix}_labelY`]).toBeCloseTo(datum[`${prefix}_idealY`]);
+      expect(datum[`${prefix}_labelHalfWidth`]).toBeLessThanOrEqual(182);
+      // a 364px chart lands in the L tier, which uses a 10px label ring gap
+      const ringGap = 10;
+      const outerRadius = (364 / 2 - 2 - ringGap) / (1 + DONUT_LABEL_MIN_SPACE_RATIO);
+      const innerX =
+        datum[`${prefix}_hemisphere`] === 'right'
+          ? datum[`${prefix}_leftX`] - 182
+          : 182 - datum[`${prefix}_rightX`];
+      const topY = datum[`${prefix}_topY`] - 182;
+      const bottomY = datum[`${prefix}_bottomY`] - 182;
+      const nearestY = topY <= 0 && bottomY >= 0 ? 0 : Math.min(Math.abs(topY), Math.abs(bottomY));
+      expect(Math.hypot(innerX, nearestY) - outerRadius).toBeCloseTo(ringGap);
+    });
+    ['left', 'right'].forEach((hemisphere) => {
+      const collisionBoxes = labels
+        .filter((datum) => datum[`${prefix}_hemisphere`] === hemisphere)
+        .map((datum) => datum[`${prefix}_collisionBoxes`]);
+      collisionBoxes.forEach((labelBoxes, index) => {
+        collisionBoxes.slice(index + 1).forEach((otherLabelBoxes) => {
+          labelBoxes.forEach(([left, right, top, bottom]) => {
+            otherLabelBoxes.forEach(([otherLeft, otherRight, otherTop, otherBottom]) => {
+              const withinHorizontalGap =
+                left < otherRight + DONUT_LABEL_COLLISION_GAP &&
+                right > otherLeft - DONUT_LABEL_COLLISION_GAP;
+              const withinVerticalGap =
+                top < otherBottom + DONUT_LABEL_COLLISION_GAP &&
+                bottom > otherTop - DONUT_LABEL_COLLISION_GAP;
+              expect(withinHorizontalGap && withinVerticalGap).toBe(false);
+            });
+          });
+        });
+      });
+    });
+  });
+
+  test.each([
+    ['direct', { value: true }, 'denseDonut_segmentLabel'],
+    ['advanced', { percent: true, showValueRow: true, swatch: true, value: true }, 'denseDonut_richSegmentLabel'],
+  ])('hovering a segment reveals its hidden %s label and hides the labels it overlaps', async (_mode, label, prefix) => {
+    Object.entries(getExpressionFunctions('en-US')).forEach(([name, fn]) => expressionFunction(name, fn));
+    expressionFunction('rscContainerWidth', (width: number) => width);
+    // small chart + long names force direct-label collisions (jsdom measures text width as ~0)
+    const data = [
+      ...Array.from({ length: 18 }, (_, index) => ({ series: `Long category name ${index + 1}`, value: 10 })),
+      { series: 'Sliver', value: 1 },
+    ];
+    const spec = buildSpec({
+      data,
+      marks: [{ markType: 'donut', color: 'series', metric: 'value', name: 'denseDonut', segmentLabels: [label] }],
+    });
+    const table = spec.data?.find(({ name }) => name === TABLE);
+    if (!table || !('values' in table)) throw new Error('Expected inline table data');
+    table.values = data;
+    const view = new View(parse(spec), { renderer: 'none' }).width(240).height(240);
+    await view.runAsync();
+
+    const hoveredSignal = `denseDonut_${HOVERED_ITEM}`;
+    const getLabelIds = () =>
+      view
+        .data(`${prefix}Data`)
+        .map((datum) => datum[MARK_ID])
+        .sort((a, b) => a - b);
+    const expectNoCollisions = () => {
+      const labels = view.data(`${prefix}Data`);
+      labels.forEach((datum, index) => {
+        labels.slice(index + 1).forEach((other) => {
+          if (datum[`${prefix}_hemisphere`] !== other[`${prefix}_hemisphere`]) return;
+          datum[`${prefix}_collisionBoxes`].forEach(([left, right, top, bottom]) => {
+            other[`${prefix}_collisionBoxes`].forEach(([otherLeft, otherRight, otherTop, otherBottom]) => {
+              const overlaps =
+                left < otherRight + DONUT_LABEL_COLLISION_GAP &&
+                right > otherLeft - DONUT_LABEL_COLLISION_GAP &&
+                top < otherBottom + DONUT_LABEL_COLLISION_GAP &&
+                bottom > otherTop - DONUT_LABEL_COLLISION_GAP;
+              expect(overlaps).toBe(false);
+            });
+          });
+        });
+      });
+    };
+    const defaultIds = getLabelIds();
+    const candidateIds = view.data(`${prefix}Candidates`).map((datum) => datum[MARK_ID]);
+    const collisionHiddenId = candidateIds.find((id) => !defaultIds.includes(id));
+    const belowMinAngleId = view
+      .data(FILTERED_TABLE)
+      .map((datum) => datum[MARK_ID])
+      .find((id) => !candidateIds.includes(id));
+    expect(collisionHiddenId).toBeDefined();
+    expect(belowMinAngleId).toBeDefined();
+
+    for (const hoveredId of [collisionHiddenId, belowMinAngleId]) {
+      await view.signal(hoveredSignal, { [MARK_ID]: hoveredId }).runAsync();
+      expect(getLabelIds()).toContain(hoveredId);
+      expectNoCollisions();
+    }
+
+    await view.signal(hoveredSignal, null).runAsync();
+    expect(getLabelIds()).toEqual(defaultIds);
+  });
+
   test('should add data correctly for boolean donut', () => {
     const data = addData(initializeSpec().data ?? [], { ...defaultDonutOptions, isBoolean: true });
 
@@ -92,14 +280,15 @@ describe('addData', () => {
   test('should sweep a semicircle donut half the full circle', () => {
     const data = addData(initializeSpec().data ?? [], { ...defaultDonutOptions, variant: 'semicircle' });
     const pieTransform = data[1].transform?.[1];
-    expect(pieTransform).toHaveProperty('startAngle', 0);
-    expect(pieTransform).toHaveProperty('endAngle', { signal: '0 + PI' });
+    expect(pieTransform).toHaveProperty('startAngle', -Math.PI / 2);
+    expect(pieTransform).toHaveProperty('endAngle', { signal: `${-Math.PI / 2} + PI` });
     expect(data[1].transform?.[4]).toHaveProperty('expr', "datum['testName_arcLength'] / (PI)");
   });
 
   test('should sweep a circle donut the full circle', () => {
     const data = addData(initializeSpec().data ?? [], defaultDonutOptions);
     const pieTransform = data[1].transform?.[0];
+    expect(pieTransform).toHaveProperty('startAngle', 0);
     expect(pieTransform).toHaveProperty('endAngle', { signal: '0 + 2 * PI' });
   });
 });
@@ -131,7 +320,7 @@ describe('addSignals()', () => {
       ...defaultDonutOptions,
       chartInspects: [{ excludeDataKeys: ['excludeFromTooltip'] }],
     });
-    expect(signals).toHaveLength(defaultSignals.length + 3);
+    expect(signals).toHaveLength(defaultSignals.length + 4);
 
     const hoveredItemSignal = signals.find((signal) => signal.name.includes(HOVERED_ITEM));
 
@@ -161,7 +350,9 @@ describe('addSignals()', () => {
   test('should add rich SegmentLabel font size signals when swatch is enabled', () => {
     const baselineSignals = addSignals(defaultSignals, defaultDonutOptions);
     const signals = addSignals(defaultSignals, { ...defaultDonutOptions, segmentLabels: [{ swatch: true }] });
-    expect(signals).toHaveLength(baselineSignals.length + 4);
+    expect(signals).toHaveLength(baselineSignals.length + 5);
+    expect(signals.find((signal) => signal.name === 'testName_sizeTier')).toBeDefined();
+    expect(signals.find((signal) => signal.name === 'testName_labelRingGap')).toBeDefined();
     expect(signals.find((signal) => signal.name === 'testName_richSegmentLabelNameFontSize')).toBeDefined();
     expect(signals.find((signal) => signal.name === 'testName_richSegmentLabelValueFontSize')).toBeDefined();
     expect(signals.find((signal) => signal.name === 'testName_richSegmentLabelDetailFontSize')).toBeDefined();
@@ -196,18 +387,15 @@ describe('addMarks()', () => {
 describe('donutSpecBuilder', () => {
   test('should add scales correctly', () => {
     const scales = addScales([], defaultDonutOptions);
-    expect(scales).toHaveLength(3);
+    expect(scales).toHaveLength(2);
     expect(scales[0]).toHaveProperty('name', COLOR_SCALE);
-    expect(scales[1]).toHaveProperty('name', 'testName_ringWidthScale');
-    expect(scales[2]).toHaveProperty('name', 'testName_sliceGapScale');
+    expect(scales[1]).toHaveProperty('name', 'testName_sizeTierScale');
   });
 
-  test('should add rich SegmentLabel font size scales when swatch is enabled', () => {
+  test('should only add the size tier scale when segment labels are present', () => {
     const scales = addScales([], { ...defaultDonutOptions, segmentLabels: [{ swatch: true }] });
-    expect(scales).toHaveLength(6);
-    expect(scales[3]).toHaveProperty('name', 'testName_richSegmentLabelNameFontSizeScale');
-    expect(scales[4]).toHaveProperty('name', 'testName_richSegmentLabelValueFontSizeScale');
-    expect(scales[5]).toHaveProperty('name', 'testName_richSegmentLabelDetailFontSizeScale');
+    expect(scales).toHaveLength(2);
+    expect(scales[1]).toHaveProperty('name', 'testName_sizeTierScale');
   });
 });
 
@@ -227,7 +415,7 @@ describe('donutSpecBuilder', () => {
   });
 
   test('should register a donut paired with a highlighted legend as interactive', () => {
-    const spec = { data: [{ name: FILTERED_TABLE }], usermeta: {} };
+    const spec = { data: [{ name: TABLE, values: [] }, { name: FILTERED_TABLE }], usermeta: {} };
     const result = addDonut(spec, {
       ...defaultDonutOptions,
       legendHighlightSignals: ['legend0_hoveredSeries'],
@@ -235,28 +423,19 @@ describe('donutSpecBuilder', () => {
     expect(result.usermeta?.interactiveMarks).toContainEqual({ name: 'testName', dimension: undefined });
   });
 
-  test('should default startAngle to -PI/2 for a semicircle donut when not explicitly provided', () => {
+  test('should start a semicircle donut at -PI/2', () => {
     const spec = { data: [{ name: FILTERED_TABLE }], usermeta: {} };
-    const { startAngle: _startAngle, ...rest } = defaultDonutOptions;
-    const result = addDonut(spec, { ...rest, variant: 'semicircle' });
+    const result = addDonut(spec, { ...defaultDonutOptions, variant: 'semicircle' });
     const emptyStateMark = result.marks?.find((mark) => mark.name === 'testName_emptyState');
-    expect(emptyStateMark?.encode?.enter?.startAngle).toEqual({ value: -Math.PI / 2 });
-    expect(emptyStateMark?.encode?.enter?.endAngle).toEqual({ signal: `${-Math.PI / 2} + PI` });
+    expect(emptyStateMark?.encode?.enter).toHaveProperty('startAngle', { value: -Math.PI / 2 });
+    expect(emptyStateMark?.encode?.enter).toHaveProperty('endAngle', { signal: `${-Math.PI / 2} + PI` });
   });
 
-  test('should default startAngle to 0 for a circle donut when not explicitly provided', () => {
+  test('should start a circle donut at 0', () => {
     const spec = { data: [{ name: FILTERED_TABLE }], usermeta: {} };
-    const { startAngle: _startAngle, ...rest } = defaultDonutOptions;
-    const result = addDonut(spec, rest);
+    const result = addDonut(spec, defaultDonutOptions);
     const emptyStateMark = result.marks?.find((mark) => mark.name === 'testName_emptyState');
-    expect(emptyStateMark?.encode?.enter?.startAngle).toEqual({ value: 0 });
-    expect(emptyStateMark?.encode?.enter?.endAngle).toEqual({ signal: '0 + 2 * PI' });
-  });
-
-  test('should honor an explicit startAngle even for a semicircle donut', () => {
-    const spec = { data: [{ name: FILTERED_TABLE }], usermeta: {} };
-    const result = addDonut(spec, { ...defaultDonutOptions, variant: 'semicircle', startAngle: 1 });
-    const emptyStateMark = result.marks?.find((mark) => mark.name === 'testName_emptyState');
-    expect(emptyStateMark?.encode?.enter?.startAngle).toEqual({ value: 1 });
+    expect(emptyStateMark?.encode?.enter).toHaveProperty('startAngle', { value: 0 });
+    expect(emptyStateMark?.encode?.enter).toHaveProperty('endAngle', { signal: '0 + 2 * PI' });
   });
 });

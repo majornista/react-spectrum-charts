@@ -11,13 +11,17 @@
  */
 import { Edges, NavigationRules, NodeObject, Nodes, Structure } from 'data-navigator';
 
-import { DEFAULT_TIME_DIMENSION, NAVIGATION_INDEX_FIELD, SINGLE_LINE_NODE_ID } from '@spectrum-charts/constants';
+import {
+  DEFAULT_TIME_DIMENSION,
+  NAVIGATION_INDEX_FIELD,
+  SINGLE_LINE_NODE_ID,
+} from '@spectrum-charts/core-s2/constants';
 import { SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { segmentId } from './buildBarStructure';
-import { DEFAULT_DATA_NAVIGATOR_LOCALE, getDataNavigatorIntl } from './dataNavigatorIntl';
-import { addOneSidedEdge, addSiblingEdge } from './graphEdgeUtils';
-import { applyDefaultLabels } from './nodeSemanticsUtils';
+import { segmentId } from './buildBarStructure.js';
+import { DEFAULT_DATA_NAVIGATOR_LOCALE, getDataNavigatorIntl } from './dataNavigatorIntl.js';
+import { addOneSidedEdge, addSiblingEdge } from './graphEdgeUtils.js';
+import { applyDefaultLabels } from './nodeSemanticsUtils.js';
 
 export interface BuildLineStructureOptions {
   /** The chart data (plain objects). */
@@ -120,7 +124,10 @@ export const buildLineStructure = ({
       edges: [],
       dimensionLevel: 2,
       derivedNode: color,
-      data: { ...(color ? { [color]: line.key } : {}), values: Object.fromEntries(line.pointIds.map((id) => [id, {}])) },
+      data: {
+        ...(color ? { [color]: line.key } : {}),
+        values: Object.fromEntries(line.pointIds.map((id) => [id, {}])),
+      },
     };
     line.rows.forEach((row, pointIndex) => {
       const pointId = line.pointIds[pointIndex];
@@ -145,7 +152,9 @@ export const buildLineStructure = ({
     // 'left' resolves via the edge's source (see lineNavigationRules), reversed relative to 'child'/'right', which resolve via target — so line -> first point via child/right, line -> last point via left.
     if (line.pointIds.length) {
       addOneSidedEdge(edges, nodes, line.divisionId, line.divisionId, line.pointIds[0], ['child', 'right']);
-      addOneSidedEdge(edges, nodes, line.divisionId, line.pointIds[line.pointIds.length - 1], line.divisionId, ['left']);
+      addOneSidedEdge(edges, nodes, line.divisionId, line.pointIds[line.pointIds.length - 1], line.divisionId, [
+        'left',
+      ]);
     }
     line.pointIds.forEach((pointId) => {
       addOneSidedEdge(edges, nodes, pointId, line.divisionId, pointId, ['parent']);
@@ -197,7 +206,12 @@ export const buildChartDescription = (
       count,
     });
   }
-  return formatMessage('line.description', { hasTitle, title: title ?? '', dimension: dimensionLabel, count: data.length });
+  return formatMessage('line.description', {
+    hasTitle,
+    title: title ?? '',
+    dimension: dimensionLabel,
+    count: data.length,
+  });
 };
 
 /** Formats a raw dimension value as a readable date/time, falling back to the raw value if it isn't a valid date. */
@@ -234,7 +248,11 @@ export const buildNodeLabel = (
   const parts = Object.entries(data)
     .filter(
       ([key, value]) =>
-        key !== NAVIGATION_INDEX_FIELD && !key.startsWith('_') && value != null && typeof value !== 'object' && typeof value !== 'function'
+        key !== NAVIGATION_INDEX_FIELD &&
+        !key.startsWith('_') &&
+        value != null &&
+        typeof value !== 'object' &&
+        typeof value !== 'function'
     )
     .map(([key, value]) => {
       const label = fieldLabels[key] ?? key;

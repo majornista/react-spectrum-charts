@@ -17,11 +17,11 @@ import {
   DEFAULT_LINE_WIDTHS,
   DEFAULT_LOCALE,
   MARK_ID,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 import { LineType, LineWidth, PartiallyRequired } from '@spectrum-charts/vega-spec-builder-s2';
 
 import './Chart.css';
-import { ChartProps } from './types';
+import { ChartProps } from './types/index.js';
 
 type ChartPropsWithDefaults =
   | 'backgroundColor'
@@ -75,3 +75,8 @@ export const applyChartPropsDefaults = (props: ChartProps): PartiallyRequired<Ch
     ...props,
   };
 };
+
+export const resolveAnimations = (
+  animations: boolean | undefined,
+  prefersReducedMotion: boolean
+): boolean | undefined => (prefersReducedMotion ? false : animations);

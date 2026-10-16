@@ -11,7 +11,7 @@
  */
 import { View } from 'vega';
 
-import { getFocusedItemBounds, getFocusedItemClientPosition } from './focusedItemGeometry';
+import { getFocusedItemBounds, getFocusedItemClientPosition } from './focusedItemGeometry.js';
 
 const datum = { datetime: 1000, value: 42 };
 const fields = { dimension: 'datetime', metric: 'value', scaleType: 'time' };
@@ -40,10 +40,19 @@ describe('getFocusedItemBounds()', () => {
 
   test('uses metricAxis as the y scale name when provided', () => {
     const view = {
-      scale: (name: string) => (name === 'xLinear' ? (v: unknown) => v as number : name === 'y2' ? (v: unknown) => (v as number) + 1000 : undefined),
+      scale: (name: string) =>
+        name === 'xLinear'
+          ? (v: unknown) => v as number
+          : name === 'y2'
+          ? (v: unknown) => (v as number) + 1000
+          : undefined,
       origin: () => [0, 0],
     } as unknown as View;
-    const bounds = getFocusedItemBounds(view, { x: 1, y: 1 }, { dimension: 'x', metric: 'y', scaleType: 'linear', metricAxis: 'y2' });
+    const bounds = getFocusedItemBounds(
+      view,
+      { x: 1, y: 1 },
+      { dimension: 'x', metric: 'y', scaleType: 'linear', metricAxis: 'y2' }
+    );
     expect(bounds.y1).toBe(1000 + 1 - 4);
   });
 
@@ -88,7 +97,10 @@ describe('getFocusedItemClientPosition()', () => {
   });
 
   test('falls back to rect + origin only when the scale lookup fails', () => {
-    const position = getFocusedItemClientPosition(mockView('xTime'), container, datum, { ...fields, scaleType: 'point' });
+    const position = getFocusedItemClientPosition(mockView('xTime'), container, datum, {
+      ...fields,
+      scaleType: 'point',
+    });
     expect(position).toStrictEqual({ clientX: 25, clientY: 37 });
   });
 });

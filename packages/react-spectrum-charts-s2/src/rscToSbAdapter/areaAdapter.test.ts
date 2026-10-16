@@ -11,37 +11,38 @@
  */
 import { createElement } from 'react';
 
-import { DEFAULT_COLOR } from '@spectrum-charts/constants';
+import { DEFAULT_COLOR } from '@spectrum-charts/core-s2/constants';
 
-import { ChartInspect } from '../components/ChartInspect';
-import { ChartPopover } from '../components/ChartPopover';
-import { getAreaOptions } from './areaAdapter';
+import { ChartInspect } from '../components/ChartInspect/index.js';
+import { ChartPopover } from '../components/ChartPopover/index.js';
+import { getAreaOptions } from './areaAdapter.js';
+import { childrenToOptions } from './childrenAdapter.js';
 
 describe('getAreaOptions()', () => {
   it('should return all basic options', () => {
-    const options = getAreaOptions({});
+    const options = getAreaOptions({}, childrenToOptions);
     expect(options.markType).toBe('area');
     expect(options.chartInspects).toHaveLength(0);
     expect(options.chartPopovers).toHaveLength(0);
   });
 
   it('should convert popover children to chartPopovers array', () => {
-    const options = getAreaOptions({ children: [createElement(ChartPopover)] });
+    const options = getAreaOptions({ children: [createElement(ChartPopover)] }, childrenToOptions);
     expect(options.chartPopovers).toHaveLength(1);
   });
 
   it('should convert ChartInspect children to chartInspects array', () => {
-    const options = getAreaOptions({ children: [createElement(ChartInspect)] });
+    const options = getAreaOptions({ children: [createElement(ChartInspect)] }, childrenToOptions);
     expect(options.chartInspects).toHaveLength(1);
   });
 
   it('should pass through included props', () => {
-    const options = getAreaOptions({ color: DEFAULT_COLOR });
+    const options = getAreaOptions({ color: DEFAULT_COLOR }, childrenToOptions);
     expect(options).toHaveProperty('color', DEFAULT_COLOR);
   });
 
   it('should not add props that are not provided', () => {
-    const options = getAreaOptions({});
+    const options = getAreaOptions({}, childrenToOptions);
     expect(options).not.toHaveProperty('color');
   });
 });

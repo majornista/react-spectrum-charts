@@ -243,6 +243,8 @@ export const DRAW_IN_ANIMATION_DURATION_MS = 1000;
 export const DONUT_RADIUS = '(min(width, height) / 2 - 2)';
 /** Calculation for a semicircle donut's radius - the arc still spans the full width from center (so it's bounded by width / 2, same as a full circle), but can use the full height since only the top half sweeps, unlike the full-circle radius which halves it */
 export const DONUT_SEMICIRCLE_RADIUS = '(min(width / 2, height) - 2)';
+/** Fill color of a boolean donut's secondary segment */
+export const DONUT_BOOLEAN_SECONDARY_COLOR = 'gray-400';
 /** Min arc angle radians to display a segment label. If the arc angle is less than this, the segment label will be hidden. */
 export const DONUT_SEGMENT_LABEL_MIN_ANGLE = 0.3;
 /** Min font size for the donut summary metric value */
@@ -280,24 +282,22 @@ export const DONUT_SUMMARY_LABEL_FONT_SIZES = [12, 14, 16, 20, 24];
 export const DONUT_DIRECT_LABEL_NAME_FONT_SIZES = [7.5, 9, 10.5, 12, 15];
 /** S2 donut direct-label value font size per named size tier (XS/S/M/L/XL) */
 export const DONUT_DIRECT_LABEL_VALUE_FONT_SIZES = [10, 12, 14, 16, 20];
-/** Gap (px) between the ring's outer edge and a direct label's rendered bounding box */
-export const DONUT_LABEL_RING_GAP = 20;
-/**
- * Gap (px) between the ring's outer edge and an advanced label's rendered bounding box - larger
- * than the direct-label ring gap since the taller swatch+multi-row block needs more breathing room.
- */
-export const DONUT_ADVANCED_LABEL_RING_GAP = 20;
+/** Gap (px) between the ring's outer edge and a direct/advanced label's rendered bounding box per named size tier (XS/S/M/L/XL) */
+export const DONUT_LABEL_RING_GAPS = [5, 5, 10, 10, 15];
+export const DONUT_LABEL_COLLISION_GAP = 4;
 /** Font weight for donut direct-label segment name text */
 export const DONUT_DIRECT_LABEL_NAME_FONT_WEIGHT = 400;
 /** Font weight for donut direct-label value text */
 export const DONUT_DIRECT_LABEL_VALUE_FONT_WEIGHT = 700;
-/**
- * Max fraction of the donut's own radius that a direct label's hemisphere-mirrored shift offset may use.
- * Label text width (a handful of px per character) doesn't shrink with the donut, so an uncapped shift
- * can demand disproportionate space at small sizes, triggering runaway autosize 'fit' shrinkage. Bounding
- * it as a fraction of the current radius keeps the offset proportionate at every size instead of a fixed px cap.
- */
-export const DONUT_LABEL_MAX_ANCHOR_OFFSET_RATIO = 0.6;
+/** Minimum space reserved for segment label text on each side of an S2 donut, as a fraction of its radius (also caps a rich label's height) */
+export const DONUT_LABEL_MIN_SPACE_RATIO = 0.6;
+/** S2 labeled-donut chart size (min of width/height) where each tier starts, i.e. where the donut reaches the cutpoint with that tier's gap (206/280/344/674) */
+export const DONUT_SIZE_TIER_LABELED_CHART_SIZES = DONUT_SIZE_TIER_CUTPOINTS.map(
+  // donut + widest labels on both sides, + the tier's label gap on both sides, + 2px padding on both sides
+  (cutpoint, index) => cutpoint * (1 + DONUT_LABEL_MIN_SPACE_RATIO) + 2 * DONUT_LABEL_RING_GAPS[index + 1] + 4
+);
+/** S2 unlabeled-donut chart size where each tier starts: the cutpoint plus DONUT_RADIUS's 2px padding on each side (124/164/204/404) */
+export const DONUT_SIZE_TIER_UNLABELED_CHART_SIZES = DONUT_SIZE_TIER_CUTPOINTS.map((cutpoint) => cutpoint + 4);
 /** S2 donut advanced-label segment-name font size per named size tier (XS/S/M/L/XL) */
 export const DONUT_ADVANCED_LABEL_NAME_FONT_SIZES = [8, 10, 12, 14, 16];
 /** S2 donut advanced-label value/% font size per named size tier (XS/S/M/L/XL) */
@@ -318,14 +318,6 @@ export const DONUT_ADVANCED_LABEL_SWATCH_GAP = 8;
 export const DONUT_ADVANCED_LABEL_NAME_VALUE_GAP = 4;
 /** Gap (px) between the value/% row and the optional detail row - directly adjacent */
 export const DONUT_ADVANCED_LABEL_VALUE_DETAIL_GAP = 0;
-/**
- * Buffer (px) added to a label block's own rendered height to compute the minimum vertical gap
- * enforced between two labels stacked/colliding in the same hemisphere. Not a sourced token -
- * roughly double the 8-10px inter-element gaps used elsewhere, chosen so adjacent labels get
- * breathing room instead of touching edge-to-edge.
- */
-export const DONUT_LABEL_COLLISION_MIN_GAP_BUFFER = 16;
-
 // venn constant
 export const DEFAULT_VENN_COLOR = 'sets';
 /** default key in data for the metric in the venn diagram */

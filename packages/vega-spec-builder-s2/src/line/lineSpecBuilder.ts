@@ -28,18 +28,18 @@ import {
   NAVIGATION_INDEX_FIELD,
   OPACITY_SCALE,
   SERIES_ID,
-} from '@spectrum-charts/constants';
-import { toCamelCase } from '@spectrum-charts/utils';
+} from '@spectrum-charts/core-s2/constants';
+import { toCamelCase } from '@spectrum-charts/core-s2/utils';
 
 import {
   addInspectData,
   addInspectSignals,
   getGroupIdTransform,
   isHighlightedByGroup,
-} from '../chartInspect/chartInspectUtils';
-import { addPopoverData } from '../chartPopover/chartPopoverUtils';
-import { addTimeTransform, getFilteredInspectData, getFilteredTableData, getTableData } from '../data/dataUtils';
-import { getLineDirectLabelData, getLineDirectLabelMarks, getLineDirectLabelSpecOptions } from '../lineDirectLabel';
+} from '../chartInspect/chartInspectUtils.js';
+import { addPopoverData } from '../chartPopover/chartPopoverUtils.js';
+import { addTimeTransform, getFilteredInspectData, getFilteredTableData, getTableData } from '../data/dataUtils.js';
+import { getLineDirectLabelData, getLineDirectLabelMarks, getLineDirectLabelSpecOptions } from '../lineDirectLabel/index.js';
 import {
   getEffectiveMetricField,
   getForecastAlternateFlagTransform,
@@ -47,8 +47,8 @@ import {
   getLineForecastBoundaryMark,
   getLineForecastLabelMarks,
   getLineForecastSpecOptions,
-} from '../lineForecast';
-import { addChartFocusRing } from '../marks/chartFocusRingUtils';
+} from '../lineForecast/index.js';
+import { addChartFocusRing } from '../marks/chartFocusRingUtils.js';
 import {
   addHoverAnimLastChangeData,
   addHoverAnimationSignals,
@@ -56,20 +56,21 @@ import {
   getHoverFractionData,
   getHoverSeriesFractionData,
   getHoverTargetData,
-} from '../marks/hoverAnimationUtils';
-import { getHoverMarkNames, getInteractiveMarkName, isInteractive } from '../marks/markUtils';
-import { getMetricRangeData, getMetricRangeGroupMarks, getMetricRanges } from '../metricRange/metricRangeUtils';
-import { addContinuousDimensionScale, addFieldToFacetScaleDomain, addMetricScale } from '../scale/scaleSpecBuilder';
-import { getDualAxisScaleNames } from '../scale/scaleUtils';
+} from '../marks/hoverAnimationUtils.js';
+import { getHoverMarkNames } from '../marks/hoverMarkUtils.js';
+import { getInteractiveMarkName, isInteractive } from '../marks/markUtils.js';
+import { getMetricRangeData, getMetricRangeGroupMarks, getMetricRanges } from '../metricRange/metricRangeUtils.js';
+import { addContinuousDimensionScale, addFieldToFacetScaleDomain, addMetricScale } from '../scale/scaleSpecBuilder.js';
+import { getDualAxisScaleNames } from '../scale/scaleUtils.js';
 import {
   addFocusSignals,
   addHoveredItemSignal,
   addInteractionModalitySignal,
   getFirstRscSeriesIdSignal,
   getLastRscSeriesIdSignal,
-} from '../signal/signalSpecBuilder';
-import { addUserMetaAnimatedMark, addUserMetaInteractiveMark, getFacetsFromOptions } from '../specUtils';
-import { addTrendlineData, getTrendlineMarks, getTrendlineScales, setTrendlineSignals } from '../trendline';
+} from '../signal/signalSpecBuilder.js';
+import { addUserMetaAnimatedMark, addUserMetaInteractiveMark, getFacetsFromOptions } from '../specUtils.js';
+import { addTrendlineData, getTrendlineMarks, getTrendlineScales, setTrendlineSignals } from '../trendline/index.js';
 import {
   ChartData,
   ColorScheme,
@@ -79,7 +80,7 @@ import {
   LineOptions,
   LineSpecOptions,
   ScSpec,
-} from '../types';
+} from '../types/index.js';
 import {
   getHoverLabelData,
   getLineHighlightedData,
@@ -87,24 +88,24 @@ import {
   getLineStaticPointData,
   getPrimarySeriesFacetData,
   getPrimarySeriesOtherExpr,
-} from './lineDataUtils';
+} from './lineDataUtils.js';
 import {
   getLineFocusRingGap,
   getLineFocusRingOuter,
   getLineGroupZIndexEncoding,
   getPointFocusRing,
-} from './lineFocusRingUtils';
+} from './lineFocusRingUtils.js';
 import {
   getHighlightedSeriesOpacityRules,
   getLineGradientMark,
   getLineHighlightOverlayGroup,
   getLineHoverMarks,
   getLineMark,
-} from './lineMarkUtils';
-import { getLinePointAnnotationMarks } from './linePointAnnotation';
-import { getLineStaticPoint, getLineStaticPointBackground } from './linePointUtils';
-import { getPopoverMarkName, isDualMetricAxis } from './lineUtils';
-import { addLineDrawInAnimationSignals, addLineDrawInLeadTransform, addLineDrawInTimeMsTransform, getLineDrawInData, getLineDrawInPointIndexData } from '../marks/drawInAnimationUtils';
+} from './lineMarkUtils.js';
+import { getLinePointAnnotationMarks } from './linePointAnnotation/index.js';
+import { getLineStaticPoint, getLineStaticPointBackground } from './linePointUtils.js';
+import { getPopoverMarkName, isDualMetricAxis } from './lineUtils.js';
+import { addLineDrawInAnimationSignals, addLineDrawInLeadTransform, addLineDrawInTimeMsTransform, getLineDrawInData, getLineDrawInPointIndexData } from '../marks/drawInAnimationUtils.js';
 
 export const addLine = produce<
   ScSpec,

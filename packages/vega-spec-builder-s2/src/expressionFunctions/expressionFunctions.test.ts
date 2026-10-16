@@ -9,17 +9,70 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { numberLocales } from '@spectrum-charts/locales';
+import { numberLocales } from '@spectrum-charts/core-s2/locales';
 
 import {
   LabelDatum,
   expressionFunctions,
   formatHorizontalTimeAxisLabels,
   formatLocaleCurrency,
+  formatPercentWithValue,
   formatShortNumber,
   formatTimeDurationLabels,
   formatVerticalAxisTimeLabels,
-} from './expressionFunctions';
+  isDonutLabelVisible,
+} from './expressionFunctions.js';
+
+describe('isDonutLabelVisible()', () => {
+  const data = [
+    { id: 'large', hemisphere: 'left', boxes: [[10, 80, 86, 114]], topY: 86, arcLength: 4 },
+    { id: 'middle', hemisphere: 'left', boxes: [[10, 80, 106, 134]], topY: 106, arcLength: 3 },
+    { id: 'small', hemisphere: 'left', boxes: [[10, 80, 132, 160]], topY: 132, arcLength: 2 },
+    { id: 'separate-x', hemisphere: 'left', boxes: [[90, 150, 90, 110]], topY: 90, arcLength: 1.5 },
+    { id: 'other-side', hemisphere: 'right', boxes: [[10, 80, 86, 114]], topY: 86, arcLength: 1 },
+  ];
+  const isVisible = (datum: (typeof data)[number]) =>
+    isDonutLabelVisible(data, datum, 'hemisphere', 'boxes', 'arcLength', 'id');
+
+  test('keeps fixed labels that do not overlap an accepted label', () => {
+    expect(isVisible(data[0])).toBe(true);
+    expect(isVisible(data[2])).toBe(true);
+    expect(isVisible(data[3])).toBe(true);
+    expect(isVisible(data[4])).toBe(true);
+  });
+
+  test('hides a smaller label that overlaps an accepted label', () => {
+    expect(isVisible(data[1])).toBe(false);
+  });
+
+  describe('with a hovered label', () => {
+    const isVisibleWhileHovering = (datum: (typeof data)[number], hoveredId: unknown) =>
+      isDonutLabelVisible(data, datum, 'hemisphere', 'boxes', 'arcLength', 'id', hoveredId);
+
+    test('shows the hovered label and hides the higher-priority labels it overlaps', () => {
+      expect(isVisibleWhileHovering(data[1], 'middle')).toBe(true);
+      expect(isVisibleWhileHovering(data[0], 'middle')).toBe(false);
+      expect(isVisibleWhileHovering(data[2], 'middle')).toBe(false);
+    });
+
+    test('keeps labels that do not overlap the hovered label', () => {
+      expect(isVisibleWhileHovering(data[3], 'middle')).toBe(true);
+      expect(isVisibleWhileHovering(data[4], 'middle')).toBe(true);
+    });
+
+    test('does not affect labels in the other hemisphere', () => {
+      data.forEach((datum) => {
+        expect(isVisibleWhileHovering(datum, 'other-side')).toBe(isVisible(datum));
+      });
+    });
+
+    test.each([null, undefined, 'missing'])('matches the default visibility when hoveredId is %s', (hoveredId) => {
+      data.forEach((datum) => {
+        expect(isVisibleWhileHovering(datum, hoveredId)).toBe(isVisible(datum));
+      });
+    });
+  });
+});
 
 describe('formatLocaleCurrency()', () => {
   test('formats US currency correctly', () => {
@@ -199,5 +252,21 @@ describe('formatShortNumber()', () => {
         percent: '\u202f%',
       })(1234567)
     ).toBe('1,2M');
+  });
+});
+
+describe('formatPercentWithValue()', () => {
+  test('should format the percent to one decimal followed by the short number value', () => {
+    expect(formatPercentWithValue('en-US')(0.652, 23456)).toBe('65.2% (23K)');
+    expect(formatPercentWithValue('en-US')(0.5, 900)).toBe('50.0% (900)');
+  });
+  test('should default to en-US', () => {
+    expect(formatPercentWithValue()(0.257, 10390)).toBe('25.7% (10K)');
+  });
+  test('should use the chart locale', () => {
+    expect(formatPercentWithValue('fr-FR')(0.652, 23456)).toBe('65,2\u202f% (23\u00a0k)');
+  });
+  test('should fall back to en-US percent formatting when only a time locale is provided', () => {
+    expect(formatPercentWithValue({ time: 'fr-FR' })(0.652, 900)).toBe('65.2% (900)');
   });
 });

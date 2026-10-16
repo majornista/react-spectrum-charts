@@ -26,14 +26,14 @@ import {
   SELECTED_ITEM,
   SELECTED_SERIES,
   SERIES_ID,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 
-import { getEffectiveMetricField } from '../lineForecast';
-import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
-import { HoverMatchRule } from '../marks/hoverAnimationUtils';
-import { hasPopover, isInteractive } from '../marks/markUtils';
-import { LineSpecOptions } from '../types';
-import { getCascadeTransforms } from './directLabelUtils';
+import { getEffectiveMetricField } from '../lineForecast/index.js';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
+import { HoverMatchRule } from '../marks/hoverAnimationUtils.js';
+import { hasPopover, isInteractive } from '../marks/markUtils.js';
+import { LineSpecOptions } from '../types/index.js';
+import { getCascadeTransforms } from './directLabelUtils.js';
 
 /** A Vega expression matching the point currently focused via keyboard navigation. */
 const getFocusedItemMatchExpr = (color?: string): string => {

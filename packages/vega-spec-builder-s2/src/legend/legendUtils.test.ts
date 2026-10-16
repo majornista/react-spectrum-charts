@@ -24,12 +24,12 @@ import {
   ROUNDED_SQUARE_PATH,
   SERIES_ID,
   VISIBILITY_OFF_PATH,
-} from '@spectrum-charts/constants';
-import { spectrum2Colors } from '@spectrum-charts/themes';
+} from '@spectrum-charts/core-s2/constants';
+import { spectrum2Colors } from '@spectrum-charts/core-s2/tokens';
 
-import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
-import { getDeemphasisRamp } from '../marks/hoverAnimationUtils';
-import { defaultLegendOptions } from './legendTestUtils';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
+import { getDeemphasisRamp } from '../marks/hoverAnimationUtils.js';
+import { defaultLegendOptions } from './legendTestUtils.js';
 import {
   getClickEncodings,
   getColumns,
@@ -40,7 +40,7 @@ import {
   getSymbolEncodings,
   getSymbolType,
   mergeLegendEncodings,
-} from './legendUtils';
+} from './legendUtils.js';
 
 describe('getSymbolEncodings()', () => {
   test('no facets and no custom values, should return all the defaults', () => {

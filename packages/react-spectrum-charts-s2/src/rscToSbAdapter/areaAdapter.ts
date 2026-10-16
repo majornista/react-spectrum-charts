@@ -11,10 +11,13 @@
  */
 import { AreaOptions } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { AreaProps } from '../types';
-import { childrenToOptions } from './childrenAdapter';
+import { AreaProps } from '../types/index.js';
+import { ChildrenToOptions } from './childOptions.types.js';
 
-export const getAreaOptions = ({ children, ...areaProps }: AreaProps): AreaOptions => {
+export const getAreaOptions = (
+  { children, ...areaProps }: AreaProps,
+  childrenToOptions: ChildrenToOptions
+): AreaOptions => {
   const { chartInspects, chartPopovers } = childrenToOptions(children);
   return {
     ...areaProps,

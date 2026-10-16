@@ -11,9 +11,9 @@
  */
 import { Mark } from 'vega';
 
-import { FOCUSED_REGION } from '@spectrum-charts/constants';
+import { FOCUSED_REGION } from '@spectrum-charts/core-s2/constants';
 
-import { addChartFocusRing, CHART_FOCUS_RING_NAME, getChartFocusRing } from './chartFocusRingUtils';
+import { addChartFocusRing, CHART_FOCUS_RING_NAME, getChartFocusRing } from './chartFocusRingUtils.js';
 
 const options = { colorScheme: 'light' as const };
 

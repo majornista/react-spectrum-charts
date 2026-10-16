@@ -9,12 +9,12 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { ColorScheme, HighlightedItem } from '../chartSpec.types';
-import { ChartInspectOptions } from '../dialogs/chartInspectSpec.types';
-import { ChartPopoverOptions } from '../dialogs/chartPopoverSpec.types';
-import { PartiallyRequired } from '../specUtil.types';
-import { DonutSummaryOptions } from './supplemental/dountSummarySpec.types';
-import { SegmentLabelOptions } from './supplemental/segmentLabelSpec.types';
+import { ColorScheme, HighlightedItem } from '../chartSpec.types.js';
+import { ChartInspectOptions } from '../dialogs/chartInspectSpec.types.js';
+import { ChartPopoverOptions } from '../dialogs/chartPopoverSpec.types.js';
+import { PartiallyRequired } from '../specUtil.types.js';
+import { DonutSummaryOptions } from './supplemental/dountSummarySpec.types.js';
+import { SegmentLabelOptions } from './supplemental/segmentLabelSpec.types.js';
 
 export interface DonutOptions {
   markType: 'donut';
@@ -30,8 +30,6 @@ export interface DonutOptions {
   metric?: string;
   /** Sets the name of the component. */
   name?: string;
-  /** Start angle of the donut in radians (0 is top dead center, and default) */
-  startAngle?: number;
   /** Segment ordering for semicircle donuts. Use `data` to preserve ordinal source order. */
   sortOrder?: 'valueDescending' | 'data';
   /**
@@ -41,11 +39,6 @@ export interface DonutOptions {
    * non-primary direct labels entirely.
    */
   emphasizedItems?: (string | number)[];
-  /**
-   * Overrides the default gray color used for segments not in `emphasizedItems`.
-   * Accepts any Spectrum 2 color token (e.g. `'gray-400'`) or CSS color value.
-   */
-  otherItemColor?: string;
   /** Hides labels for segments not in `emphasizedItems`. */
   hideDeemphasizedLabels?: boolean;
   /**
@@ -73,14 +66,16 @@ type DonutOptionsWithDefaults =
   | 'name'
   | 'segmentLabels'
   | 'sortOrder'
-  | 'startAngle'
   | 'variant';
 
 export interface DonutSpecOptions extends PartiallyRequired<DonutOptions, DonutOptionsWithDefaults> {
   colorScheme: ColorScheme;
   highlightedItem?: HighlightedItem;
+  highlightedSeries?: string | number;
   idKey: string;
   index: number;
+  isHoverAnimate?: boolean;
+  segmentIds?: number[];
   legendHighlightSignals?: string[];
   markType: 'donut';
 }

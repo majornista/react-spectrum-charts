@@ -36,18 +36,16 @@ import {
   FOCUSED_ITEM,
   HOVERED_ITEM,
   INTERACTION_MODALITY,
-  LAST_RSC_SERIES_ID,
   LINE_TYPE_SCALE,
   OPACITY_SCALE,
   SELECTED_SERIES,
   SERIES_ID,
-} from '@spectrum-charts/constants';
-import { getS2ColorValue } from '@spectrum-charts/themes';
+} from '@spectrum-charts/core-s2/constants';
+import { getS2ColorValue } from '@spectrum-charts/core-s2/tokens';
 
-import { getPopovers } from '../chartPopover/chartPopoverUtils';
-import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
-import { getDeemphasisRamp, getHoverFractionSignal } from '../marks/hoverAnimationUtils';
-import { getLineDrawInXEncoding, getLineDrawInYEncoding } from '../marks/drawInAnimationUtils'
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
+import { getPopovers } from '../chartPopover/chartPopoverUtils.js';
+import { getLineDrawInXEncoding, getLineDrawInYEncoding } from '../marks/drawInAnimationUtils.js'
 import {
   getColorProductionRule,
   getColorProductionRuleSignalString,
@@ -58,44 +56,20 @@ import {
   getXProductionRule,
   hasActionBar,
   hasPopover,
-} from '../marks/markUtils';
-import { getScaleName } from '../scale/scaleSpecBuilder';
-import { getDualAxisScaleNames } from '../scale/scaleUtils';
-import { getStrokeDashFromLineType } from '../specUtils';
-import { ScaleType } from '../types';
-import { MIN_LABEL_GAP, getDirectLabelTextMarks } from './directLabelUtils';
-import { getPrimarySeriesOtherExpr } from './lineDataUtils';
-import { getHighlightPoint, getSecondaryHighlightPoint, getSelectionPoint } from './linePointUtils';
-import { LineMarkOptions, isDualMetricAxis } from './lineUtils';
-
-/**
- * Gets the Y encoding for line marks with dual metric axis support
- * @param lineMarkOptions - Line mark options including metricAxis and dualMetricAxis
- * @param metric - The metric field name
- * @returns Y encoding with conditional scale selection for dual metric axis
- */
-export const getLineYEncoding = (lineMarkOptions: LineMarkOptions, metric: string): ProductionRule<NumericValueRef> => {
-  const { metricAxis } = lineMarkOptions;
-
-  if (isDualMetricAxis(lineMarkOptions)) {
-    const baseScaleName = metricAxis || 'yLinear';
-    const scaleNames = getDualAxisScaleNames(baseScaleName);
-
-    return [
-      {
-        test: `datum.${SERIES_ID} === ${LAST_RSC_SERIES_ID}`,
-        scale: scaleNames.secondaryScale,
-        field: metric,
-      },
-      {
-        scale: scaleNames.primaryScale,
-        field: metric,
-      },
-    ];
-  }
-
-  return [{ scale: metricAxis || 'yLinear', field: metric }];
-};
+} from '../marks/markUtils.js';
+import { getScaleName } from '../scale/scaleSpecBuilder.js';
+import { getStrokeDashFromLineType } from '../specUtils.js';
+import { ScaleType } from '../types/index.js';
+import { MIN_LABEL_GAP, getDirectLabelTextMarks } from './directLabelUtils.js';
+import { getPrimarySeriesOtherExpr } from './lineDataUtils.js';
+import { getLineDeemphasisOpacitySignal, getLineYEncoding } from './lineEncodingUtils.js';
+import {
+  getHighlightPoint,
+  getPointSizeEncoding,
+  getSecondaryHighlightPoint,
+  getSelectionPoint,
+} from './linePointUtils.js';
+import { LineMarkOptions } from './lineUtils.js';
 
 const GRADIENT_BASE_OPACITY = 0.2;
 const FORECAST_GRADIENT_RATIO = 0.4;
@@ -272,13 +246,6 @@ export const getLineMark = (lineMarkOptions: LineMarkOptions, dataSource: string
         strokeWidth: getLineStrokeWidth(lineMarkOptions),
       },
     },
-  };
-};
-
-export const getLineDeemphasisOpacitySignal = (name: string): NumericValueRef => {
-  const ramp = getDeemphasisRamp(getHoverFractionSignal(name));
-  return {
-    signal: `${FADE_FACTOR} + (1 - ${FADE_FACTOR}) * ${ramp}`,
   };
 };
 
@@ -574,7 +541,7 @@ const getVoronoiMarks = (lineOptions: LineMarkOptions, dataSource: string): Mark
  * @returns SymbolMark
  */
 const getLinePointsForVoronoi = (lineOptions: LineMarkOptions, dataSource: string): Mark => {
-  const { dimension, metric, name, scaleType } = lineOptions;
+  const { dimension, metric, name, pointSize, scaleType } = lineOptions;
 
   return {
     name: `${name}_pointsForVoronoi`,
@@ -587,6 +554,9 @@ const getLinePointsForVoronoi = (lineOptions: LineMarkOptions, dataSource: strin
         y: getLineYEncoding(lineOptions, metric),
         fill: { value: 'transparent' },
         stroke: { value: 'transparent' },
+        // matches the highlight point's extent so hovering doesn't change the autosize bounds
+        size: getPointSizeEncoding(pointSize),
+        strokeWidth: { signal: CHART_SIZE_HOVER_STROKE_WIDTH },
       },
       update: {
         x: getXProductionRule(scaleType, dimension),

@@ -11,7 +11,7 @@
  */
 import { View } from 'vega';
 
-import { toCamelCase } from '@spectrum-charts/utils';
+import { toCamelCase } from '@spectrum-charts/core-s2/utils';
 import { MarkBounds, SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
 
 /** The subset of a navigable Line's fields needed to look up its x/y scales and datum fields for a keyboard-focused point's scale-projected bounds. */
@@ -43,9 +43,7 @@ const getScaledPoint = (
     const yScale = view.scale(metricAxis || 'yLinear');
     return { x: xScale(datum[dimension]), y: yScale(datum[metric]) };
   } catch (e) {
-    if (process.env.NODE_ENV !== 'production') {
-      console.warn('Unable to resolve scale for focused item position', e);
-    }
+    console.warn('Unable to resolve scale for focused item position', e);
     return undefined;
   }
 };

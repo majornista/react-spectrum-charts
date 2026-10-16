@@ -27,22 +27,22 @@ import {
   OPACITY_SCALE,
   SELECTED_SERIES,
   SERIES_ID,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 
-import { getLineDrawInXEncoding, getLineDrawInYEncoding } from '../marks/drawInAnimationUtils';
-import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
-import { getDeemphasisRamp, getHoverFractionSignal } from '../marks/hoverAnimationUtils';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
+import { getLineDrawInXEncoding, getLineDrawInYEncoding } from '../marks/drawInAnimationUtils.js';
+import { getDeemphasisRamp, getHoverFractionSignal } from '../marks/hoverAnimationUtils.js';
+import { getLineDeemphasisOpacitySignal } from './lineEncodingUtils.js';
 import {
   getAlternateSegmentStrokeDash,
   getHighlightedSeriesOpacityRules,
-  getLineDeemphasisOpacitySignal,
   getLineGradientMark,
   getLineHighlightOverlayGroup,
   getLineHoverMarks,
   getLineMark,
   getLineOpacity, getLineStrokeWidth,
-} from './lineMarkUtils';
-import { defaultLineMarkOptions } from './lineTestUtils';
+} from './lineMarkUtils.js';
+import { defaultLineMarkOptions } from './lineTestUtils.js';
 
 describe('getLineMark()', () => {
   test('should return line mark', () => {
@@ -340,22 +340,6 @@ describe('getLineOpacity()', () => {
       signal: `(${focusMatchExpr}) ? 1 : ${FADE_FACTOR}`,
     });
     expect(opacityRule.at(-1)).toStrictEqual(DEFAULT_OPACITY_RULE);
-  });
-});
-
-describe('getLineDeemphasisOpacitySignal()', () => {
-  test('returns the shared deemphasis-ramp opacity signal for the given mark name', () => {
-    const ramp = getDeemphasisRamp(getHoverFractionSignal('line0'));
-    expect(getLineDeemphasisOpacitySignal('line0')).toStrictEqual({
-      signal: `${FADE_FACTOR} + (1 - ${FADE_FACTOR}) * ${ramp}`,
-    });
-  });
-
-  test('uses the given mark name in the fraction lookup, not a hardcoded one', () => {
-    const ramp = getDeemphasisRamp(getHoverFractionSignal('bar0'));
-    expect(getLineDeemphasisOpacitySignal('bar0')).toStrictEqual({
-      signal: `${FADE_FACTOR} + (1 - ${FADE_FACTOR}) * ${ramp}`,
-    });
   });
 });
 

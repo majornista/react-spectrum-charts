@@ -32,16 +32,27 @@ import { Donut, DonutSummary, SegmentLabel } from '@spectrum-charts/react-spectr
 Unlike the base package, S2 does not have a `ChartTooltip` component — use `ChartInspect`
 instead.
 
+Interactive donut segments and their direct or advanced labels animate opacity on hover. 
+Legend hover, controlled highlights, and popover selection share the animation state.
+Set `animations={false}` or `animationTypes={[]}`
+on `Chart` to keep instant opacity changes instead. A donut without interactive children
+or highlighting remains static.
+
+Inside a `Donut`, both render default content without children: the segment's color swatch and
+series name, followed by its share of the visible total and short-number value (e.g.
+`65.2% (23K)`), formatted with the chart `locale`. When children are provided, their content
+replaces the default content.
+
 ```jsx
 <Donut metric="count" color="browser">
-  <ChartInspect>
+  <ChartInspect />
+  <ChartPopover width="auto">
     {(datum) => (
       <div>
-        <div>Browser: {datum.browser}</div>
-        <div>Visitors: {datum.count}</div>
+        {datum.browser}: {datum.count} visitors
       </div>
     )}
-  </ChartInspect>
+  </ChartPopover>
 </Donut>
 ```
 
@@ -104,6 +115,10 @@ and/or metric value.
   <SegmentLabel percent />
 </Donut>
 ```
+
+Labels stay fixed at each segment's midpoint. A label is hidden when it would overlap a label for a larger
+segment, or when its segment is narrower than 0.3 radians (about 17°). Hovering a segment always shows its
+label and temporarily hides any labels that would overlap it.
 
 When `emphasizedItems` is set, two `SegmentLabel` children can provide different label
 treatments for emphasized and de-emphasized segments:
@@ -204,9 +219,8 @@ point is displayed as a percent of the whole (e.g. a success/failure rate):
 Setting `variant="semicircle"` renders a top-half arc instead of a full
 circle. By default, data is sorted descending by `metric`, so the largest segment renders
 leftmost. Set `sortOrder="data"` to preserve source order for ordinal categories.
-`startAngle` defaults to
-`-Math.PI / 2` for this variant (a 9 o'clock start, sweeping clockwise through 12 to 3
-o'clock), but an explicit `startAngle` still overrides it.
+Semicircles start at 9 o'clock and sweep clockwise through 12 to 3 o'clock.
+Circle donuts start at 12 o'clock. These start positions are fixed.
 
 ```jsx
 <Donut metric="count" color="browser" variant="semicircle">
@@ -255,19 +269,13 @@ omitted.
             <td>emphasizedItems</td>
             <td>(string | number)[]</td>
             <td>–</td>
-            <td>Segments whose categorical colors remain emphasized.</td>
+            <td>Segments whose categorical colors remain emphasized. Other segments use <code>gray-400</code>.</td>
         </tr>
         <tr>
             <td>hideDeemphasizedLabels</td>
             <td>boolean</td>
             <td>false</td>
             <td>Hides labels for segments outside <code>emphasizedItems</code>.</td>
-        </tr>
-        <tr>
-            <td>otherItemColor</td>
-            <td>string</td>
-            <td>–</td>
-            <td>Color token or CSS color used for segments outside <code>emphasizedItems</code>.</td>
         </tr>
         <tr>
             <td>holeRatio</td>
@@ -298,12 +306,6 @@ omitted.
             <td>'valueDescending' | 'data'</td>
             <td>'valueDescending'</td>
             <td>Controls semicircle segment ordering. <code>'data'</code> preserves source order for ordinal categories.</td>
-        </tr>
-        <tr>
-            <td>startAngle</td>
-            <td>number</td>
-            <td>0</td>
-            <td>Start angle of the donut in radians. <code>0</code> is top dead center. Defaults to <code>-Math.PI / 2</code> when <code>variant="semicircle"</code>.</td>
         </tr>
         <tr>
             <td>variant</td>

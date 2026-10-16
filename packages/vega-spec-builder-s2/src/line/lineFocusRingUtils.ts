@@ -20,16 +20,16 @@ import {
   NAVIGATION_ID_SEPARATOR,
   NAVIGATION_INDEX_FIELD,
   SINGLE_LINE_NODE_ID,
-} from '@spectrum-charts/constants';
-import { getS2ColorValue } from '@spectrum-charts/themes';
+} from '@spectrum-charts/core-s2/constants';
+import { getS2ColorValue } from '@spectrum-charts/core-s2/tokens';
 
-import { FOCUS_RING_STROKE_WIDTH } from '../marks/chartFocusRingUtils';
-import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
-import { getXProductionRule } from '../marks/markUtils';
-import { LineSpecOptions } from '../types';
-import { getLineYEncoding } from './lineMarkUtils';
+import { FOCUS_RING_STROKE_WIDTH } from '../marks/chartFocusRingUtils.js';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
+import { getXProductionRule } from '../marks/markUtils.js';
+import { LineSpecOptions } from '../types/index.js';
+import { getLineYEncoding } from './lineEncodingUtils.js';
 
-export { getChartFocusRing } from '../marks/chartFocusRingUtils';
+export { getChartFocusRing } from '../marks/chartFocusRingUtils.js';
 
 const LINE_FOCUS_RING_OUTER_STROKE_WIDTH = 12;
 const LINE_FOCUS_RING_GAP_STROKE_WIDTH = 8;

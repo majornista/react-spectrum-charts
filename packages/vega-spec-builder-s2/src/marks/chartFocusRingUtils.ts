@@ -11,10 +11,10 @@
  */
 import { Mark, RectMark } from 'vega';
 
-import { FOCUSED_REGION } from '@spectrum-charts/constants';
-import { getS2ColorValue } from '@spectrum-charts/themes';
+import { FOCUSED_REGION } from '@spectrum-charts/core-s2/constants';
+import { getS2ColorValue } from '@spectrum-charts/core-s2/tokens';
 
-import { ColorScheme } from '../types';
+import { ColorScheme } from '../types/index.js';
 
 export const FOCUS_RING_STROKE_WIDTH = 2;
 export const FOCUS_RING_ROUNDED_RADIUS = 6;

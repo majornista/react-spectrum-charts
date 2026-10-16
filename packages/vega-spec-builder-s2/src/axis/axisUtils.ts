@@ -11,9 +11,9 @@
  */
 import { Axis, Mark, Scale, SignalRef } from 'vega';
 
-import { FILTERED_TABLE } from '@spectrum-charts/constants';
+import { FILTERED_TABLE } from '@spectrum-charts/core-s2/constants';
 
-import { AxisSpecOptions, DivergingBarMark, Granularity, Orientation, Position } from '../types';
+import { AxisSpecOptions, DivergingBarMark, Granularity, Orientation, Position } from '../types/index.js';
 import {
   getAxisLabelsEncoding,
   getAxisLabelTooltipRule,
@@ -22,7 +22,8 @@ import {
   getLabelFormat,
   getLabelOffset,
   getTimeLabelFormats,
-} from './axisLabelUtils';
+} from './axisLabelUtils.js';
+import { isVerticalAxis } from './axisPositionUtils.js';
 
 /**
  * Generates a default vega axis from the axis options
@@ -445,15 +446,6 @@ export const getPriorityMergedSignal = (priorityRule: unknown, fallbackRule: unk
   );
   const fallbackEntries = Array.isArray(fallbackRule) ? fallbackRule : [fallbackRule];
   return { signal: productionRuleToExpr([...priorityEntries, ...fallbackEntries]) };
-};
-
-/**
- * Returns whether the axis is vertical.
- * @param position
- * @returns boolean
- */
-export const isVerticalAxis = (position: Position): boolean => {
-  return ['left', 'right'].includes(position);
 };
 
 /**

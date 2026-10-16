@@ -11,10 +11,13 @@
  */
 import { BarOptions } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { BarProps } from '../types';
-import { childrenToOptions } from './childrenAdapter';
+import { BarProps } from '../types/index.js';
+import { ChildrenToOptions } from './childOptions.types.js';
 
-export const getBarOptions = ({ children, onClick, ...barProps }: BarProps): BarOptions => {
+export const getBarOptions = (
+  { children, onClick, ...barProps }: BarProps,
+  childrenToOptions: ChildrenToOptions
+): BarOptions => {
   const { barAnnotations, barDirectLabels, chartInspects, chartPopovers } = childrenToOptions(children);
   return {
     ...barProps,

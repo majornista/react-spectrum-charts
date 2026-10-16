@@ -17,27 +17,27 @@ import {
   DONUT_ADVANCED_LABEL_VALUE_FONT_SIZES,
   DONUT_DIRECT_LABEL_NAME_FONT_SIZES,
   DONUT_DIRECT_LABEL_VALUE_FONT_SIZES,
-  DONUT_SIZE_TIER_CUTPOINTS,
-} from '@spectrum-charts/constants';
+  DONUT_SEGMENT_LABEL_MIN_ANGLE,
+  HOVERED_ITEM,
+  MARK_ID,
+} from '@spectrum-charts/core-s2/constants';
 
-import { DonutSpecOptions, SegmentLabelSpecOptions } from '../types';
-import { defaultDonutOptions } from './donutTestUtils';
-import { getDonutEmptyStateTest } from './donutUtils';
+import { DonutSpecOptions, SegmentLabelSpecOptions } from '../types/index.js';
+import { defaultDonutOptions } from './donutTestUtils.js';
+import { getDonutEmptyStateTest } from './donutUtils.js';
 import {
   getRichSegmentLabelData,
   getRichSegmentLabelMarks,
-  getRichSegmentLabelScales,
   getRichSegmentLabelSignals,
   getRichSegmentLabelValueText,
   getSegmentLabelData,
   getSegmentLabelMarks,
-  getSegmentLabelScales,
   getSegmentLabelSignals,
   getSegmentLabelTextMark,
   getSegmentLabelValueText,
   getSegmentLabelValueTextMark,
   getTextRuleExpr,
-} from './segmentLabelUtils';
+} from './segmentLabelUtils.js';
 
 const defaultDonutOptionsWithSegmentLabel: DonutSpecOptions = {
   ...defaultDonutOptions,
@@ -208,29 +208,7 @@ describe('getTextRuleExpr()', () => {
   });
 });
 
-describe('getSegmentLabelScales()', () => {
-  test('should return empty array if there is not a SegmentLabel on the Donut', () => {
-    expect(getSegmentLabelScales(defaultDonutOptions)).toEqual([]);
-  });
-
-  test('should snap outer diameter to the nearest named tier for name/value font sizes', () => {
-    const scales = getSegmentLabelScales(defaultDonutOptionsWithSegmentLabel);
-    expect(scales).toEqual([
-      {
-        name: 'testName_segmentLabelNameFontSizeScale',
-        type: 'threshold',
-        domain: DONUT_SIZE_TIER_CUTPOINTS,
-        range: DONUT_DIRECT_LABEL_NAME_FONT_SIZES,
-      },
-      {
-        name: 'testName_segmentLabelValueFontSizeScale',
-        type: 'threshold',
-        domain: DONUT_SIZE_TIER_CUTPOINTS,
-        range: DONUT_DIRECT_LABEL_VALUE_FONT_SIZES,
-      },
-    ]);
-  });
-
+describe('segment label modes', () => {
   test('should create separate direct and rich labels for emphasized and de-emphasized segments', () => {
     const donutOptions = {
       ...defaultDonutOptions,
@@ -242,11 +220,13 @@ describe('getSegmentLabelScales()', () => {
     };
     const data = [...getSegmentLabelData(donutOptions), ...getRichSegmentLabelData(donutOptions)];
     expect(data.map(({ name }) => name)).toEqual([
+      'testName_deemphasizedSegmentLabelCandidates',
       'testName_deemphasizedSegmentLabelData',
+      'testName_emphasizedRichSegmentLabelCandidates',
       'testName_emphasizedRichSegmentLabelData',
     ]);
     expect(data[0].transform?.[1]).toHaveProperty('expr', 'indexof(["Chrome"], datum.testColor) < 0');
-    expect(data[1].transform?.[1]).toHaveProperty('expr', 'indexof(["Chrome"], datum.testColor) >= 0');
+    expect(data[2].transform?.[1]).toHaveProperty('expr', 'indexof(["Chrome"], datum.testColor) >= 0');
   });
 
   test('should omit de-emphasized labels when hideDeemphasizedLabels is true', () => {
@@ -270,7 +250,10 @@ describe('getSegmentLabelScales()', () => {
         ],
       }),
     ];
-    expect(data.map(({ name }) => name)).toEqual(['testName_emphasizedRichSegmentLabelData']);
+    expect(data.map(({ name }) => name)).toEqual([
+      'testName_emphasizedRichSegmentLabelCandidates',
+      'testName_emphasizedRichSegmentLabelData',
+    ]);
   });
 
   test('labelMode and hideDeemphasizedLabels should have no effect when emphasizedItems is not set', () => {
@@ -284,7 +267,10 @@ describe('getSegmentLabelScales()', () => {
     };
     const data = [...getSegmentLabelData(donutOptions), ...getRichSegmentLabelData(donutOptions)];
     // falls back to the legacy single-label behavior: only the first SegmentLabel is used, unfiltered
-    expect(data.map(({ name }) => name)).toEqual(['testName_emphasizedRichSegmentLabelData']);
+    expect(data.map(({ name }) => name)).toEqual([
+      'testName_emphasizedRichSegmentLabelCandidates',
+      'testName_emphasizedRichSegmentLabelData',
+    ]);
     expect(data[0].transform?.some((t) => t.type === 'filter' && 'expr' in t && t.expr.includes('indexof'))).toBe(
       false
     );
@@ -296,120 +282,52 @@ describe('getSegmentLabelSignals()', () => {
     expect(getSegmentLabelSignals(defaultDonutOptions)).toEqual([]);
   });
 
-  test('should resolve name/value font sizes from the outer diameter', () => {
+  test('should resolve name/value font sizes from the size tier', () => {
     const signals = getSegmentLabelSignals(defaultDonutOptionsWithSegmentLabel);
     expect(signals).toEqual([
-      {
-        name: 'testName_segmentLabelNameFontSize',
-        update:
-          "scale('testName_segmentLabelNameFontSizeScale', 2 * (((min(width, height) / 2 - 2) - 20) / (1 + 0.6)))",
-      },
-      {
-        name: 'testName_segmentLabelValueFontSize',
-        update:
-          "scale('testName_segmentLabelValueFontSizeScale', 2 * (((min(width, height) / 2 - 2) - 20) / (1 + 0.6)))",
-      },
+      { name: 'testName_segmentLabelNameFontSize', update: `[${DONUT_DIRECT_LABEL_NAME_FONT_SIZES.join(', ')}][testName_sizeTier]` },
+      { name: 'testName_segmentLabelValueFontSize', update: `[${DONUT_DIRECT_LABEL_VALUE_FONT_SIZES.join(', ')}][testName_sizeTier]` },
     ]);
   });
 });
 
 describe('rich SegmentLabel', () => {
-  test('should create font scales and signals for each rich label row', () => {
-    expect(getRichSegmentLabelScales(richDonutOptions)).toEqual([
-      {
-        name: 'testName_richSegmentLabelNameFontSizeScale',
-        type: 'threshold',
-        domain: DONUT_SIZE_TIER_CUTPOINTS,
-        range: DONUT_ADVANCED_LABEL_NAME_FONT_SIZES,
-      },
-      {
-        name: 'testName_richSegmentLabelValueFontSizeScale',
-        type: 'threshold',
-        domain: DONUT_SIZE_TIER_CUTPOINTS,
-        range: DONUT_ADVANCED_LABEL_VALUE_FONT_SIZES,
-      },
-      {
-        name: 'testName_richSegmentLabelDetailFontSizeScale',
-        type: 'threshold',
-        domain: DONUT_SIZE_TIER_CUTPOINTS,
-        range: DONUT_ADVANCED_LABEL_DETAIL_FONT_SIZES,
-      },
-    ]);
-    const donutDiameter = `2 * (((min(width, height) / 2 - 2) - 20) / (1 + 0.6))`;
+  test('should create font size signals for each rich label row', () => {
     expect(getRichSegmentLabelSignals(richDonutOptions)).toEqual([
-      {
-        name: 'testName_richSegmentLabelNameFontSize',
-        update: `scale('testName_richSegmentLabelNameFontSizeScale', ${donutDiameter})`,
-      },
-      {
-        name: 'testName_richSegmentLabelValueFontSize',
-        update: `scale('testName_richSegmentLabelValueFontSizeScale', ${donutDiameter})`,
-      },
-      {
-        name: 'testName_richSegmentLabelDetailFontSize',
-        update: `scale('testName_richSegmentLabelDetailFontSizeScale', ${donutDiameter})`,
-      },
+      { name: 'testName_richSegmentLabelNameFontSize', update: `[${DONUT_ADVANCED_LABEL_NAME_FONT_SIZES.join(', ')}][testName_sizeTier]` },
+      { name: 'testName_richSegmentLabelValueFontSize', update: `[${DONUT_ADVANCED_LABEL_VALUE_FONT_SIZES.join(', ')}][testName_sizeTier]` },
+      { name: 'testName_richSegmentLabelDetailFontSize', update: `[${DONUT_ADVANCED_LABEL_DETAIL_FONT_SIZES.join(', ')}][testName_sizeTier]` },
     ]);
   });
 
-  test('should create collision data for rich labels', () => {
+  test('should create position data for rich labels', () => {
     const dataSources = getRichSegmentLabelData(richDonutOptions);
-    expect(dataSources).toHaveLength(1);
-    const [data] = dataSources;
-    if (!data) throw new Error('Expected one rich SegmentLabel data source');
-    expect(data).toEqual({
-      name: 'testName_richSegmentLabelData',
+    expect(dataSources).toHaveLength(2);
+    const [candidates, visible] = dataSources;
+    if (!candidates || !visible) throw new Error('Expected candidate and visible rich SegmentLabel data sources');
+    expect(candidates).toMatchObject({
+      name: 'testName_richSegmentLabelCandidates',
       source: 'filteredTable',
-      transform: [
-        { type: 'filter', expr: "datum['testName_arcLength'] >= 0.3" },
-        {
-          type: 'formula',
-          as: 'testName_richSegmentLabel_hemisphere',
-          expr: "datum['testName_arcTheta'] <= PI ? 'right' : 'left'",
-        },
-        {
-          type: 'formula',
-          as: 'testName_richSegmentLabel_idealY',
-          expr: "height / 2 - ((((min(width, height) / 2 - 2) - 20) / (1 + 0.6)) + 20) * cos(datum['testName_arcTheta'])",
-        },
-        {
-          type: 'window',
-          groupby: ['testName_richSegmentLabel_hemisphere'],
-          sort: { field: 'testName_richSegmentLabel_idealY', order: 'ascending' },
-          ops: ['row_number'],
-          as: ['testName_richSegmentLabel_collisionRank'],
-        },
-        {
-          type: 'formula',
-          as: 'testName_richSegmentLabel_collisionRank',
-          expr: "datum['testName_richSegmentLabel_collisionRank'] - 1",
-        },
-        {
-          type: 'formula',
-          as: 'testName_richSegmentLabel_collisionHelper',
-          expr: "datum['testName_richSegmentLabel_idealY'] - (testName_richSegmentLabelNameFontSize + 4 + testName_richSegmentLabelValueFontSize + 0 + testName_richSegmentLabelDetailFontSize + 16) * datum['testName_richSegmentLabel_collisionRank']",
-        },
-        {
-          type: 'window',
-          groupby: ['testName_richSegmentLabel_hemisphere'],
-          sort: { field: 'testName_richSegmentLabel_idealY', order: 'ascending' },
-          ops: ['max'],
-          fields: ['testName_richSegmentLabel_collisionHelper'],
-          frame: [null, 0],
-          as: ['testName_richSegmentLabel_collisionRunningMax'],
-        },
-        {
-          type: 'formula',
-          as: 'testName_richSegmentLabel_adjustedY',
-          expr: "datum['testName_richSegmentLabel_collisionRunningMax'] + (testName_richSegmentLabelNameFontSize + 4 + testName_richSegmentLabelValueFontSize + 0 + testName_richSegmentLabelDetailFontSize + 16) * datum['testName_richSegmentLabel_collisionRank']",
-        },
-        {
-          type: 'formula',
-          as: 'testName_richSegmentLabel_collisionHalfWidth',
-          expr: "sqrt(max(0, pow((((min(width, height) / 2 - 2) - 20) / (1 + 0.6)), 2) - pow(datum['testName_richSegmentLabel_adjustedY'] - height / 2, 2))) + (20)",
-        },
-      ],
     });
+    expect(candidates.transform).toHaveLength(14);
+    expect(candidates.transform?.[1]).toHaveProperty('as', 'testName_richSegmentLabel_hemisphere');
+    expect(candidates.transform?.[2]).toHaveProperty('as', 'testName_richSegmentLabel_radius');
+    expect(candidates.transform?.[3]).toHaveProperty('as', 'testName_richSegmentLabel_idealY');
+    expect(candidates.transform?.[4]).toHaveProperty('as', 'testName_richSegmentLabel_labelY');
+    expect(candidates.transform?.[5]).toHaveProperty('as', 'testName_richSegmentLabel_centerY');
+    expect(candidates.transform?.[6]).toHaveProperty('as', 'testName_richSegmentLabel_topY');
+    expect(candidates.transform?.[7]).toHaveProperty('as', 'testName_richSegmentLabel_bottomY');
+    expect(candidates.transform?.[8]).toHaveProperty('as', 'testName_richSegmentLabel_labelHalfWidth');
+    expect(candidates.transform?.[9]).toHaveProperty('expr', expect.stringContaining('NameFontSize / 2'));
+    expect(candidates.transform?.[10]).toHaveProperty('expr', expect.stringContaining('DetailFontSize / 2'));
+    expect(candidates.transform?.[11]).toHaveProperty('as', 'testName_richSegmentLabel_leftX');
+    expect(candidates.transform?.[12]).toHaveProperty('as', 'testName_richSegmentLabel_rightX');
+    expect(candidates.transform?.[13]).toHaveProperty('as', 'testName_richSegmentLabel_collisionBoxes');
+    expect(visible).toMatchObject({
+      name: 'testName_richSegmentLabelData',
+      source: 'testName_richSegmentLabelCandidates',
+    });
+    expect(visible.transform?.[0]).toHaveProperty('expr', expect.stringContaining('isDonutLabelVisible'));
   });
 
   test('should create swatch, name, value, detail value, and total suffix marks', () => {
@@ -430,19 +348,23 @@ describe('rich SegmentLabel', () => {
     }
     expect(swatch.encode?.update?.size).toEqual([
       {
-        test: "length(data('filteredTable')) === 0 || !data('testName_sumData')[0]['sum'] || 2 * (((min(width, height) / 2 - 2) - 20) / (1 + 0.6)) < 160",
+        test: "length(data('filteredTable')) === 0 || !data('testName_sumData')[0]['sum'] || testName_sizeTier < 2",
         value: 0,
       },
       { signal: '256' },
     ]);
+    expect(swatch.encode?.update?.y).toEqual({
+      signal: "datum['testName_richSegmentLabel_labelY']",
+    });
     expect(name.encode?.update?.dx).toEqual({
       signal:
-        "(datum['testName_richSegmentLabel_hemisphere'] === 'right' ? 1 : -1) * (2 * (((min(width, height) / 2 - 2) - 20) / (1 + 0.6)) >= 160 ? 24 : 0)",
+        "(datum['testName_richSegmentLabel_hemisphere'] === 'right' ? 1 : -1) * (testName_sizeTier >= 2 ? 24 : 0)",
     });
-    expect(value.encode?.update?.dy).toEqual({
-      signal:
-        "datum['testName_richSegmentLabel_adjustedY'] <= height / 2 ? (-((testName_richSegmentLabelDetailFontSize + 0) * (min(1, ((((min(width, height) / 2 - 2) - 20) / (1 + 0.6)) * 0.6) / (testName_richSegmentLabelNameFontSize + 4 + testName_richSegmentLabelValueFontSize + 0 + testName_richSegmentLabelDetailFontSize))))) : ((testName_richSegmentLabelNameFontSize + 4) * (min(1, ((((min(width, height) / 2 - 2) - 20) / (1 + 0.6)) * 0.6) / (testName_richSegmentLabelNameFontSize + 4 + testName_richSegmentLabelValueFontSize + 0 + testName_richSegmentLabelDetailFontSize))))",
-    });
+    expect(name.encode?.update?.dy).toEqual({ signal: '0' });
+    expect(value.encode?.update?.dy).not.toHaveProperty(
+      'signal',
+      expect.stringContaining("cos(datum['testName_arcTheta'])")
+    );
     expect(detail.encode?.enter?.text).toEqual([
       { test: "length(data('filteredTable')) === 0 || !data('testName_sumData')[0]['sum']", value: '' },
       { test: "isNumber(datum['testMetric'])", signal: "format(datum['testMetric'], ',')" },
@@ -462,9 +384,7 @@ describe('rich SegmentLabel', () => {
     };
     const marks = getRequiredGroupMarks(getOnlyRichLabelGroup(swatchOnlyOptions));
     expect(marks.map(({ name }) => name)).toEqual(['testName_richSegmentLabelSwatch', 'testName_richSegmentLabelName']);
-    expect(marks[1]?.encode?.update?.dy).toEqual({
-      signal: "datum['testName_richSegmentLabel_adjustedY'] <= height / 2 ? (0) : 0",
-    });
+    expect(marks[1]?.encode?.update?.dy).toEqual({ signal: '0' });
   });
 
   test('should create a detail value without a total suffix or primary value row', () => {
@@ -477,10 +397,19 @@ describe('rich SegmentLabel', () => {
       'testName_richSegmentLabelName',
       'testName_richSegmentLabelDetailValue',
     ]);
-    expect(marks[1]?.encode?.update?.dy).toEqual({
-      signal:
-        "datum['testName_richSegmentLabel_adjustedY'] <= height / 2 ? (0) : ((testName_richSegmentLabelNameFontSize + 4) * (min(1, ((((min(width, height) / 2 - 2) - 20) / (1 + 0.6)) * 0.6) / (testName_richSegmentLabelNameFontSize + 0 + testName_richSegmentLabelDetailFontSize))))",
-    });
+    expect(marks[1]?.encode?.update?.dy).not.toHaveProperty(
+      'signal',
+      expect.stringContaining("cos(datum['testName_arcTheta'])")
+    );
+    const [candidates] = getRichSegmentLabelData(detailOnlyOptions);
+    expect(candidates?.transform?.[13]).toHaveProperty(
+      'expr',
+      expect.stringContaining('testName_richSegmentLabelDetailFontSize')
+    );
+    expect(candidates?.transform?.[13]).not.toHaveProperty(
+      'expr',
+      expect.stringContaining('testName_richSegmentLabelValueFontSize')
+    );
   });
 
   test('should reuse the standard value and percent formatting rules', () => {
@@ -494,26 +423,49 @@ describe('rich SegmentLabel', () => {
   });
 
   test('should not create rich content for direct labels or boolean donuts', () => {
-    expect(getRichSegmentLabelScales(defaultDonutOptionsWithSegmentLabel)).toEqual([]);
     expect(getRichSegmentLabelSignals(defaultDonutOptionsWithSegmentLabel)).toEqual([]);
     expect(getRichSegmentLabelData(defaultDonutOptionsWithSegmentLabel)).toEqual([]);
     expect(getRichSegmentLabelMarks({ ...richDonutOptions, isBoolean: true })).toEqual([]);
   });
 });
 
-describe('label anchor x/y (collision-aware positioning) and dx (hemisphere offset)', () => {
-  test('y should come from the collision-adjusted field, not a polar radius/theta anchor', () => {
+describe('label anchor x/y and dx (hemisphere offset)', () => {
+  test('normalizes arc angles for both direct and rich label hemisphere fields', () => {
+    const directData = getSegmentLabelData({
+      ...defaultDonutOptions,
+      segmentLabels: [{}],
+    });
+    const richData = getRichSegmentLabelData({
+      ...defaultDonutOptions,
+      segmentLabels: [{ swatch: true }],
+    });
+    const expected =
+      "(((datum['testName_arcTheta']) % (2 * PI)) + 2 * PI) % (2 * PI) <= PI ? 'right' : 'left'";
+
+    expect(directData[0]?.transform?.[1]).toHaveProperty('expr', expected);
+    expect(richData[0]?.transform?.[1]).toHaveProperty('expr', expected);
+  });
+
+  test('y should come from the slice-derived label field', () => {
     const mark = getSegmentLabelTextMark(defaultSegmentLabelOptions);
-    expect(mark.encode?.update?.y).toEqual({ field: 'testName_segmentLabel_adjustedY' });
+    expect(mark.encode?.update?.y).toEqual({ field: 'testName_segmentLabel_labelY' });
+    expect(mark.encode?.update?.baseline).toEqual({ value: 'middle' });
     expect(mark.encode?.update?.radius).toBeUndefined();
     expect(mark.encode?.update?.theta).toBeUndefined();
   });
 
-  test('x should place the anchor at the collision-adjusted ring half-width, mirrored by hemisphere', () => {
+  test('rich label rows should be centered on the slice-derived label field', () => {
+    const marks = getRequiredGroupMarks(getOnlyRichLabelGroup(richDonutOptions));
+    const nameMark = marks.find(({ name }) => name === 'testName_richSegmentLabelName');
+    expect(nameMark?.encode?.update?.y).toEqual({ field: 'testName_richSegmentLabel_labelY' });
+    expect(nameMark?.encode?.update?.baseline).toEqual({ value: 'middle' });
+  });
+
+  test('x should place the anchor at the radial half-width, mirrored by hemisphere', () => {
     const mark = getSegmentLabelTextMark(defaultSegmentLabelOptions);
     expect(mark.encode?.update?.x).toEqual({
       signal:
-        "datum['testName_segmentLabel_hemisphere'] === 'right' ? width / 2 + datum['testName_segmentLabel_collisionHalfWidth'] : width / 2 - datum['testName_segmentLabel_collisionHalfWidth']",
+        "datum['testName_segmentLabel_hemisphere'] === 'right' ? width / 2 + datum['testName_segmentLabel_labelHalfWidth'] : width / 2 - datum['testName_segmentLabel_labelHalfWidth']",
     });
   });
 
@@ -540,14 +492,14 @@ describe('label anchor x/y (collision-aware positioning) and dx (hemisphere offs
 });
 
 describe('truncation limit', () => {
-  test('right hemisphere should never be truncated (limit 0, unlimited) regardless of content width', () => {
+  test('should constrain both hemispheres when content exceeds the available reach', () => {
     const mark = getSegmentLabelTextMark(defaultSegmentLabelOptions);
     const limitSignal = (mark.encode?.update?.limit as { signal: string }).signal;
-    expect(limitSignal).toContain("datum['testName_segmentLabel_hemisphere'] === 'right' ||");
-    expect(limitSignal).toMatch(/=== 'right'.*\? 0 :/);
+    expect(limitSignal).not.toContain('hemisphere');
+    expect(limitSignal).toContain('? 0 : max(1,');
   });
 
-  test("left hemisphere should only apply a real limit when content exceeds the available reach, not the line's own natural width", () => {
+  test("should only apply a real limit when content exceeds the available reach, not the line's own natural width", () => {
     const mark = getSegmentLabelTextMark(defaultSegmentLabelOptions);
     const limitSignal = (mark.encode?.update?.limit as { signal: string }).signal;
     // guards against the razor's-edge case where limit equals the line's own exact width - see
@@ -562,6 +514,28 @@ describe('truncation limit', () => {
     const [valueMark] = getSegmentLabelValueTextMark({ ...defaultSegmentLabelOptions, value: true });
     expect(nameMark.encode?.update?.limit).toEqual(valueMark.encode?.update?.limit);
   });
+
+  test('should constrain every rich label row on both hemispheres', () => {
+    const marks = getRequiredGroupMarks(getOnlyRichLabelGroup(richDonutOptions));
+    const textMarks = marks.filter(({ type }) => type === 'text');
+
+    textMarks.forEach((mark) => {
+      const limitSignal = (mark.encode?.update?.limit as { signal: string }).signal;
+      expect(limitSignal).not.toMatch(/hemisphere.*\|\|/);
+      expect(limitSignal).toContain('? 0 : max(1,');
+    });
+  });
+
+  test('should reserve preceding detail-row content before limiting the remaining text', () => {
+    const marks = getRequiredGroupMarks(getOnlyRichLabelGroup(richDonutOptions));
+    const detail = marks.find(({ name }) => name === 'testName_richSegmentLabelDetailValue');
+    const suffix = marks.find(({ name }) => name === 'testName_richSegmentLabelDetailSuffix');
+    const detailLimit = (detail?.encode?.update?.limit as { signal: string }).signal;
+    const suffixLimit = (suffix?.encode?.update?.limit as { signal: string }).signal;
+
+    expect(detailLimit).toContain("datum['testName_richSegmentLabel_hemisphere'] === 'left'");
+    expect(suffixLimit).toContain("datum['testName_richSegmentLabel_hemisphere'] === 'right'");
+  });
 });
 
 describe('getSegmentLabelTextMark()', () => {
@@ -573,17 +547,17 @@ describe('getSegmentLabelTextMark()', () => {
     const mark = getSegmentLabelTextMark(defaultSegmentLabelOptions);
     expect(mark.encode?.update?.dy).toBeUndefined();
   });
-  test('name dy should shift up when the collision-adjusted position is in the top half, not a fixed px amount, so the gap stays 0px at every tier', () => {
+  test('name dy should center the name/value block on the slice', () => {
     const mark = getSegmentLabelTextMark({ ...defaultSegmentLabelOptions, value: true });
     expect(mark.encode?.update?.dy).toEqual({
-      signal: "datum['testName_segmentLabel_adjustedY'] <= height / 2 ? -testName_segmentLabelValueFontSize : 0",
+      signal: '-testName_segmentLabelValueFontSize / 2',
     });
   });
   test('should hide labels when the donut is in the empty state', () => {
     const mark = getSegmentLabelTextMark(defaultSegmentLabelOptions);
     expect(mark.encode?.update?.fontSize).toEqual([
       {
-        test: `${getDonutEmptyStateTest('testName')} || 2 * (((min(width, height) / 2 - 2) - 20) / (1 + 0.6)) < 120`,
+        test: `${getDonutEmptyStateTest('testName')} || testName_sizeTier < 1`,
         value: 0,
       },
       { signal: 'testName_segmentLabelNameFontSize' },
@@ -621,10 +595,10 @@ describe('s2 styles', () => {
       ]);
     });
 
-    test('value dy should shift down when the collision-adjusted position is in the bottom half, not a fixed px amount, so the gap stays 0px at every tier', () => {
+    test('value dy should center the name/value block on the slice', () => {
       const [mark] = getSegmentLabelValueTextMark({ ...defaultSegmentLabelOptions, value: true });
       expect(mark.encode?.update?.dy).toEqual({
-        signal: "datum['testName_segmentLabel_adjustedY'] <= height / 2 ? 0 : testName_segmentLabelNameFontSize",
+        signal: 'testName_segmentLabelNameFontSize / 2',
       });
     });
   });
@@ -691,6 +665,45 @@ describe('hover behavior', () => {
       },
       { value: '#505050' },
     ]);
+  });
+});
+
+describe('hovered label reveal', () => {
+  const minAngleExpr = `datum['testName_arcLength'] >= ${DONUT_SEGMENT_LABEL_MIN_ANGLE}`;
+  const hoveredIdExpr = `isValid(testName_${HOVERED_ITEM}) ? testName_${HOVERED_ITEM}.${MARK_ID} : null`;
+  const interactiveDonutOptions: DonutSpecOptions = {
+    ...defaultDonutOptions,
+    segmentLabels: [{ value: true }],
+  };
+
+  test('interactive direct labels keep the hovered segment past the min-angle filter', () => {
+    const [candidates] = getSegmentLabelData(interactiveDonutOptions);
+    expect(candidates.transform?.[0]).toHaveProperty(
+      'expr',
+      `${minAngleExpr} || datum.${MARK_ID} === (${hoveredIdExpr})`
+    );
+  });
+
+  test('interactive direct labels pass the hovered id to isDonutLabelVisible', () => {
+    const [, visible] = getSegmentLabelData(interactiveDonutOptions);
+    expect(visible.transform?.[0]).toHaveProperty('expr', expect.stringMatching(/isDonutLabelVisible\(.*\)$/));
+    expect(visible.transform?.[0]).toHaveProperty('expr', expect.stringContaining(`, ${hoveredIdExpr})`));
+  });
+
+  test('non-interactive direct labels keep the plain min-angle filter and pass a null hovered id', () => {
+    const [candidates, visible] = getSegmentLabelData({ ...defaultDonutOptions, segmentLabels: [{ value: false }] });
+    expect(candidates.transform?.[0]).toHaveProperty('expr', minAngleExpr);
+    expect(visible.transform?.[0]).toHaveProperty('expr', expect.stringMatching(/, null\)$/));
+    expect(visible.transform?.[0]).not.toHaveProperty('expr', expect.stringContaining(HOVERED_ITEM));
+  });
+
+  test('rich labels use the same hovered-label wiring', () => {
+    const [candidates, visible] = getRichSegmentLabelData(richDonutOptions);
+    expect(candidates.transform?.[0]).toHaveProperty(
+      'expr',
+      `${minAngleExpr} || datum.${MARK_ID} === (${hoveredIdExpr})`
+    );
+    expect(visible.transform?.[0]).toHaveProperty('expr', expect.stringContaining(`, ${hoveredIdExpr})`));
   });
 });
 

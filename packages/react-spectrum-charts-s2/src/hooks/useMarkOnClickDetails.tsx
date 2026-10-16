@@ -11,10 +11,13 @@
  */
 import { createElement, useMemo } from 'react';
 
-import { Bar, BarElement, Chart, ChartChildElement, Line, LineElement, MarkCallback } from '../index';
-import { ContextMenuMode } from '../types/marks/line.types';
-import { ContextMenuCallback } from '../types/util.types';
-import { getAllMarkElements } from '../utils';
+import { Bar } from '../components/Bar/index.js';
+import { Line } from '../components/Line/index.js';
+import { BarElement, ChartChildElement, LineElement, MarkCallback } from '../types/index.js';
+import { ContextMenuMode } from '../types/marks/line.types.js';
+import { ContextMenuCallback } from '../types/util.types.js';
+import { getAllMarkElements } from '../utils/index.js';
+import { ChartContainer } from './ChartContainer.js';
 
 type MappedMarkElement = { name: string; element: BarElement | LineElement };
 
@@ -28,8 +31,8 @@ export type MarkOnClickDetail = {
 export default function useMarkOnClickDetails(children: ChartChildElement[]): MarkOnClickDetail[] {
   const markElements = useMemo(() => {
     return [
-      ...getAllMarkElements(createElement(Chart, { data: [] }, children), Bar, []),
-      ...getAllMarkElements(createElement(Chart, { data: [] }, children), Line, []),
+      ...getAllMarkElements(createElement(ChartContainer, undefined, children), Bar, []),
+      ...getAllMarkElements(createElement(ChartContainer, undefined, children), Line, []),
     ] as MappedMarkElement[];
   }, [children]);
 

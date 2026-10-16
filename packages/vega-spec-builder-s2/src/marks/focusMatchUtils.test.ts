@@ -9,9 +9,9 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { FOCUSED_DIMENSION, FOCUSED_ITEM } from '@spectrum-charts/constants';
+import { FOCUSED_DIMENSION, FOCUSED_ITEM } from '@spectrum-charts/core-s2/constants';
 
-import { getFocusedGroupOrItemMatchExpr } from './focusMatchUtils';
+import { getFocusedGroupOrItemMatchExpr } from './focusMatchUtils.js';
 
 /** Evaluates a generated Vega boolean expression as JS, standing in for Vega's own `isValid`/`indexof`/`length` functions. */
 const evalMatchExpr = (

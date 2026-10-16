@@ -11,7 +11,7 @@
  */
 import { RefObject } from 'react';
 
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { View } from 'vega';
 
 import {
@@ -22,15 +22,17 @@ import {
   FOCUSED_REGION,
   HOVERED_ITEM,
   MARK_ID,
+  NAVIGATION_INDEX_FIELD,
   SELECTED_ITEM,
+  SERIES_ID,
   SINGLE_LINE_NODE_ID,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 import { Datum, MarkBounds } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { getItemBounds, triggerPopover } from '../utils/markClickUtils';
-import { segmentId } from './buildBarStructure';
-import { NavigableChartType } from './buildChartStructure';
-import { attachDataNavigator } from './dataNavigatorAdapter';
+import { getItemBounds, triggerPopover } from '../utils/markClickUtils.js';
+import { segmentId } from './buildBarStructure.js';
+import { NavigableChartType } from './buildChartStructure.js';
+import { attachDataNavigator } from './dataNavigatorAdapter.js';
 
 jest.mock('../utils/markClickUtils', () => ({
   ...jest.requireActual('../utils/markClickUtils'),
@@ -131,10 +133,18 @@ const mockView = () => {
  * Populates the fake bottom-axis label scenegraph items getVisibleAxisLabelColumns() reads bounds
  * from directly (view-relative, no owning group offset), one per value, left-to-right.
  */
-const setAxisLabelItems = (values: string[], boundsFor: (index: number) => { x1: number; y1: number; x2: number; y2: number }): void => {
+const setAxisLabelItems = (
+  values: string[],
+  boundsFor: (index: number) => { x1: number; y1: number; x2: number; y2: number }
+): void => {
   axisLabelItems.length = 0;
   values.forEach((value, index) => {
-    axisLabelItems.push({ opacity: 1, datum: { value }, bounds: boundsFor(index), mark: { group: { orient: 'bottom' } } });
+    axisLabelItems.push({
+      opacity: 1,
+      datum: { value },
+      bounds: boundsFor(index),
+      mark: { group: { orient: 'bottom' } },
+    });
   });
 };
 
@@ -288,7 +298,12 @@ describe('attachDataNavigator()', () => {
 
   test('shows a clean axis-titled tooltip (only dimension + metric) for a bar without a ChartInspect', async () => {
     (view.data as jest.Mock).mockReturnValue(data);
-    attach({ markName: 'bar0', metric: 'downloads', fieldLabels: { browser: 'Browser', downloads: 'Downloads' }, hasChartInspect: false });
+    attach({
+      markName: 'bar0',
+      metric: 'downloads',
+      fieldLabels: { browser: 'Browser', downloads: 'Downloads' },
+      hasChartInspect: false,
+    });
     setRingBounds({ x1: 10, y1: 20, x2: 30, y2: 40 });
     entryButton().click();
     fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
@@ -299,7 +314,12 @@ describe('attachDataNavigator()', () => {
 
   test('keeps the full-datum tooltip (for ChartInspect to render) when the bar has a ChartInspect', async () => {
     (view.data as jest.Mock).mockReturnValue(data);
-    attach({ markName: 'bar0', metric: 'downloads', fieldLabels: { browser: 'Browser', downloads: 'Downloads' }, hasChartInspect: true });
+    attach({
+      markName: 'bar0',
+      metric: 'downloads',
+      fieldLabels: { browser: 'Browser', downloads: 'Downloads' },
+      hasChartInspect: true,
+    });
     setRingBounds({ x1: 10, y1: 20, x2: 30, y2: 40 });
     entryButton().click();
     fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
@@ -331,6 +351,25 @@ describe('attachDataNavigator()', () => {
     tooltipCallback.mockClear();
     fireEvent.keyDown(focused(), { key: 'Escape', code: 'Escape' });
     expect(tooltipCallback).toHaveBeenCalledWith(undefined, undefined, undefined, null);
+  });
+
+  test('logs instead of rejecting when applying focus signals fails', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const error = new Error('runAsync failed');
+    (view.runAsync as jest.Mock).mockRejectedValue(error);
+    attach({ markName: 'bar0' });
+    entryButton().click();
+    fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+    await waitFor(() =>
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error)
+    );
+
+    consoleSpy.mockClear();
+    fireEvent.keyDown(focused(), { key: 'Escape', code: 'Escape' });
+    await waitFor(() =>
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error)
+    );
+    consoleSpy.mockRestore();
   });
 
   test('ArrowDown moves to the next bar, the same as ArrowRight', () => {
@@ -481,21 +520,27 @@ describe('attachDataNavigator()', () => {
       entryButton().click();
       fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // root -> Chrome stack
       fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // stack -> Chrome|Mac (top segment)
-      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Chrome', 'Mac'));
+      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+        segmentId('Chrome', 'Mac')
+      );
     };
 
     test('ArrowRight from a segment moves to the same series in the adjacent stack', () => {
       drillToTopSegment();
       signal.mockClear();
       fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' });
-      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Firefox', 'Mac'));
+      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+        segmentId('Firefox', 'Mac')
+      );
     });
 
     test('ArrowDown from a segment moves within the stack to the next segment', () => {
       drillToTopSegment();
       signal.mockClear();
       fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
-      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Chrome', 'Windows'));
+      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+        segmentId('Chrome', 'Windows')
+      );
     });
 
     describe('horizontal orientation rotates the arrow-key axes', () => {
@@ -514,21 +559,27 @@ describe('attachDataNavigator()', () => {
         entryButton().click();
         fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // root -> Chrome stack
         fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // stack -> Chrome|Windows (origin segment)
-        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Chrome', 'Windows'));
+        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+          segmentId('Chrome', 'Windows')
+        );
       };
 
       test('ArrowDown moves to the same series in the adjacent stack (stacks run top-to-bottom)', () => {
         drillToOriginSegmentHorizontal();
         signal.mockClear();
         fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
-        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Firefox', 'Windows'));
+        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+          segmentId('Firefox', 'Windows')
+        );
       });
 
       test('ArrowRight moves within the stack to the next segment (segments run left-to-right)', () => {
         drillToOriginSegmentHorizontal();
         signal.mockClear();
         fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' });
-        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Chrome', 'Mac'));
+        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+          segmentId('Chrome', 'Mac')
+        );
       });
     });
 
@@ -570,7 +621,9 @@ describe('attachDataNavigator()', () => {
       const stackAggregateRows = [{ browser: 'Chrome', min_value1: 0, max_value1: 27000 }];
 
       const attachAndDrillToSegment = async () => {
-        (view.data as jest.Mock).mockImplementation((name: string) => (name === 'bar0_stacks' ? stackAggregateRows : segmentRows));
+        (view.data as jest.Mock).mockImplementation((name: string) =>
+          name === 'bar0_stacks' ? stackAggregateRows : segmentRows
+        );
         setStackRingBounds({ x1: 0, y1: 0, x2: 10, y2: 10 });
         attachDataNavigator({
           container,
@@ -790,6 +843,22 @@ describe('attachDataNavigator()', () => {
       await Promise.resolve(); // flush the .then() chained after runAfter's runAsync()
 
       expect(lastTooltipValue()).not.toBeUndefined();
+    });
+
+    test('logs instead of rejecting when the re-render after a mouseout clear fails', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      attachWithMarkName();
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      const error = new Error('runAsync failed');
+      (view.runAsync as jest.Mock).mockRejectedValue(error);
+
+      simulateMouseoutClear('bar0_dimensionHoverArea_hoveredItem');
+
+      await waitFor(() =>
+        expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error)
+      );
+      consoleSpy.mockRestore();
     });
 
     test('does nothing when no node is keyboard-focused', () => {
@@ -1020,7 +1089,9 @@ describe('attachDataNavigator()', () => {
       ];
 
       const attachStackedWithPopoverRefs = (chartId = 'stacked-popover-chart') => {
-        (view.data as jest.Mock).mockImplementation((name: string) => (name === 'bar0_stacks' ? stackAggregateRows : []));
+        (view.data as jest.Mock).mockImplementation((name: string) =>
+          name === 'bar0_stacks' ? stackAggregateRows : []
+        );
         const selectedData: RefObject<Datum | null> = { current: null };
         const selectedDataBounds: RefObject<MarkBounds> = { current: { x1: 0, y1: 0, x2: 0, y2: 0 } };
         const selectedDataName: RefObject<string> = { current: '' };
@@ -1040,7 +1111,7 @@ describe('attachDataNavigator()', () => {
         return { selectedData, selectedDataBounds, selectedDataName };
       };
 
-      test('opens a popover with the stack\'s aggregate row, anchored to the dimension-hover-area bounds', () => {
+      test("opens a popover with the stack's aggregate row, anchored to the dimension-hover-area bounds", () => {
         setDimensionAreaItems(stackAggregateRows);
         const { selectedData, selectedDataName } = attachStackedWithPopoverRefs();
         entryButton().click();
@@ -1161,15 +1232,15 @@ describe('attachDataNavigator()', () => {
     const enterAxisRegion = () => {
       attachWithAxis();
       entryButton().click(); // chart root
-      fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' }); // chart root -> axis root
+      fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' }); // chart root -> axis root
     };
 
-    test('Right from the chart root clears the chart-region focus signal', () => {
+    test('Down from the chart root clears the chart-region focus signal', () => {
       enterAxisRegion();
       expect(signaledWith(FOCUSED_REGION, null)).toBe(true);
     });
 
-    test('Right from the chart root shows the axis focus ring', () => {
+    test('Down from the chart root shows the axis focus ring', () => {
       enterAxisRegion();
       expect(focusRing().style.display).toBe('block');
     });
@@ -1242,19 +1313,19 @@ describe('attachDataNavigator()', () => {
       expect(focusRing().style).toMatchObject({ left: '-6px', top: '94px', width: '152px', height: '32px' });
     });
 
-    test('Left from the axis root returns to the chart region', () => {
+    test('Up from the axis root returns to the chart region', () => {
       enterAxisRegion();
       signal.mockClear();
 
-      fireEvent.keyDown(focused(), { key: 'ArrowLeft', code: 'ArrowLeft' });
+      fireEvent.keyDown(focused(), { key: 'ArrowUp', code: 'ArrowUp' });
 
       expect(signaledWith(FOCUSED_REGION, 'chart')).toBe(true);
     });
 
-    test('Left from the axis root clears the axis focus ring', () => {
+    test('Up from the axis root clears the axis focus ring', () => {
       enterAxisRegion();
 
-      fireEvent.keyDown(focused(), { key: 'ArrowLeft', code: 'ArrowLeft' });
+      fireEvent.keyDown(focused(), { key: 'ArrowUp', code: 'ArrowUp' });
 
       expect(focusRing().style.display).toBe('none');
     });
@@ -1264,7 +1335,7 @@ describe('attachDataNavigator()', () => {
       axisLabelItems.length = 0; // no labels rendered, e.g. an empty/zero-width axis
       entryButton().click();
 
-      fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' });
+      fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
 
       expect(focusRing().style.display).toBe('none');
     });
@@ -1281,7 +1352,7 @@ describe('attachDataNavigator()', () => {
       expect(focusRing().style.display).toBe('none');
     });
 
-    test('reapplies the focused tick\'s dimension row when a real mouseout clobbers the shared hover signal', () => {
+    test("reapplies the focused tick's dimension row when a real mouseout clobbers the shared hover signal", () => {
       enterAxisRegion();
       fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // focuses the 'Chrome' tick
       signal.mockClear();
@@ -1348,6 +1419,37 @@ describe('attachDataNavigator()', () => {
     test('focusing the first point sets the single-item focus signal', () => {
       enterFirstPoint();
       expect(signaledWith(FOCUSED_ITEM, '1')).toBe(true);
+    });
+
+    test('keeps single-line click ids independent of the view series id', () => {
+      const rows = lineData.map((row, index) => ({
+        ...row,
+        [SERIES_ID]: 'view-series',
+        [NAVIGATION_INDEX_FIELD]: index + 1,
+      }));
+      (view.data as jest.Mock).mockReturnValue(rows);
+      attachLine();
+
+      fireViewEvent('mousedown', { datum: rows[1] });
+
+      expect(signaledWith(FOCUSED_ITEM, '2')).toBe(true);
+    });
+
+    test('keeps multi-line click and activation keyed by color when the view has synthetic series ids', () => {
+      const data = [
+        { datetime: 0, value: 28, series: 'A' },
+        { datetime: 0, value: 43, series: 'B' },
+      ];
+      const rows = data.map((row, index) => ({ ...row, [SERIES_ID]: String(index), [NAVIGATION_INDEX_FIELD]: 1 }));
+      const onNodeClick = jest.fn();
+      (view.data as jest.Mock).mockReturnValue(rows);
+      attachLine({ data, color: 'series', seriesFields: ['series'], onNodeClick });
+
+      fireViewEvent('mousedown', { datum: rows[1] });
+      expect(signaledWith(FOCUSED_ITEM, segmentId('B', 1))).toBe(true);
+
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(onNodeClick).toHaveBeenCalledWith(rows[1]);
     });
 
     // Regression: a single-series line's division has no derivedNode/color value to report, so it
@@ -1419,7 +1521,7 @@ describe('attachDataNavigator()', () => {
       expect(signaledWith(SELECTED_ITEM, undefined)).toBe(false);
     });
 
-    test('fires onNodeClick with the focused point\'s row when activated', () => {
+    test("fires onNodeClick with the focused point's row when activated", () => {
       const onNodeClick = jest.fn();
       attachLine({ onNodeClick });
       entryButton().click();

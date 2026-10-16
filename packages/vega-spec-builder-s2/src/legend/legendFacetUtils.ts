@@ -18,10 +18,10 @@ import {
   OPACITY_SCALE,
   SYMBOL_SHAPE_SCALE,
   SYMBOL_SIZE_SCALE,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 
-import { FacetType, SecondaryFacetType } from '../types';
-import { Facet } from './legendUtils';
+import { FacetType, SecondaryFacetType } from '../types/index.js';
+import { Facet } from './legendUtils.js';
 
 /** A scale domain field can be a signal reference instead of a plain field name; only the latter is usable as a facet key. */
 const isFieldName = (field: ScaleField): field is string => typeof field === 'string';

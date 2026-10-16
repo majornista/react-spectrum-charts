@@ -19,17 +19,17 @@ import {
   NAVIGATION_ID_SEPARATOR,
   NAVIGATION_INDEX_FIELD,
   SINGLE_LINE_NODE_ID,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 
-import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils';
-import { defaultLineOptions } from './lineTestUtils';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
+import { defaultLineOptions } from './lineTestUtils.js';
 import {
   getChartFocusRing,
   getLineFocusRingGap,
   getLineFocusRingOuter,
   getLineGroupZIndexEncoding,
   getPointFocusRing,
-} from './lineFocusRingUtils';
+} from './lineFocusRingUtils.js';
 
 // defaultLineOptions.color is the string field 'series' → a multi-line chart.
 // singleLineOptions' static { value } color is what a single-series line actually has — ColorFacet

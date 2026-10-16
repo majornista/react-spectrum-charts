@@ -11,9 +11,11 @@
  */
 import { createElement, useMemo } from 'react';
 
-import { Axis, AxisElement, Chart, ChartChildElement } from '../index';
-import { AxisLabelClickCallback } from '../types/util.types';
-import { getAllElements } from '../utils';
+import { Axis } from '../components/Axis/index.js';
+import { AxisElement, ChartChildElement } from '../types/index.js';
+import { AxisLabelClickCallback } from '../types/util.types.js';
+import { getAllElements } from '../utils/index.js';
+import { ChartContainer } from './ChartContainer.js';
 
 type MappedAxisElement = { name: string; element: AxisElement };
 
@@ -24,7 +26,7 @@ export type AxisLabelOnClickDetail = {
 
 export default function useAxisLabelOnClickDetails(children: ChartChildElement[]): AxisLabelOnClickDetail[] {
   const axisElements = useMemo(() => {
-    return getAllElements(createElement(Chart, { data: [] }, children), Axis, []) as MappedAxisElement[];
+    return getAllElements(createElement(ChartContainer, undefined, children), Axis, []) as MappedAxisElement[];
   }, [children]);
 
   return useMemo(

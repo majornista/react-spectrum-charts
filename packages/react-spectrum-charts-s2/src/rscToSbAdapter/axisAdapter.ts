@@ -11,10 +11,13 @@
  */
 import { AxisOptions } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { AxisProps } from '../types';
-import { childrenToOptions } from './childrenAdapter';
+import { AxisProps } from '../types/index.js';
+import { ChildrenToOptions } from './childOptions.types.js';
 
-export const getAxisOptions = ({ children, onClick, ...axisProps }: AxisProps): AxisOptions => {
+export const getAxisOptions = (
+  { children, onClick, ...axisProps }: AxisProps,
+  childrenToOptions: ChildrenToOptions
+): AxisOptions => {
   const { referenceLines, axisThumbnails } = childrenToOptions(children);
 
   return {

@@ -11,10 +11,10 @@
  */
 import { NodeObject, Structure } from 'data-navigator';
 
-import { NAVIGATION_INDEX_FIELD } from '@spectrum-charts/constants';
+import { NAVIGATION_INDEX_FIELD } from '@spectrum-charts/core-s2/constants';
 
-import { segmentId } from './buildBarStructure';
-import { buildChartDescription, buildLineStructure, buildNodeLabel, getLineNodeId } from './buildLineStructure';
+import { segmentId } from './buildBarStructure.js';
+import { buildChartDescription, buildLineStructure, buildNodeLabel, getLineNodeId } from './buildLineStructure.js';
 
 /** Follows a single edge-tagged move manually, mirroring how data-navigator's own input resolves one. */
 const move = (structure: Structure, from: string, navId: string): string | undefined => {

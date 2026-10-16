@@ -11,7 +11,7 @@
  */
 import { View } from 'vega';
 
-import { MARK_ID } from '@spectrum-charts/constants';
+import { MARK_ID } from '@spectrum-charts/core-s2/constants';
 
 import {
   findFocusedBarSceneItem,
@@ -19,7 +19,7 @@ import {
   findFocusedLineSceneItem,
   hideFocusedItemTooltip,
   showFocusedItemTooltip,
-} from './focusedItemTooltip';
+} from './focusedItemTooltip.js';
 
 const MARK_NAME = 'bar0';
 const RING_NAME = `${MARK_NAME}_focusRing`;

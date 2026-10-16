@@ -12,17 +12,31 @@
 
 import { RectEncodeEntry, RectMark } from 'vega';
 
-import { FOCUSED_DIMENSION, FOCUSED_ITEM, NAVIGATION_ID_SEPARATOR, SELECTED_ITEM, STACK_ID } from '@spectrum-charts/constants';
-import { getS2ColorValue } from '@spectrum-charts/themes';
+import {
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
+  NAVIGATION_ID_SEPARATOR,
+  SELECTED_ITEM,
+  SERIES_ID,
+  STACK_ID,
+} from '@spectrum-charts/core-s2/constants';
+import { getS2ColorValue } from '@spectrum-charts/core-s2/tokens';
 
-import { BarSpecOptions } from '../types';
-import { getDualAxisScaleNames } from '../scale/scaleUtils';
-import { getOrientationProperties, isDodgedAndStacked, isDualMetricAxis, rotateRectClockwiseIfNeeded } from './barUtils';
+import { BarSpecOptions } from '../types/index.js';
+import { getDualAxisScaleNames } from '../scale/scaleUtils.js';
+import { getOrientationProperties, isDodgedAndStacked, isDualMetricAxis, rotateRectClockwiseIfNeeded } from './barUtils.js';
 
 const FOCUS_RING_STROKE_WIDTH = 2;
 const FOCUS_RING_ROUNDED_RADIUS = 6;
 const FOCUS_RING_FLAT_RADIUS = 2;
 const FOCUS_RING_OFFSET = 3;
+
+/**
+ * Converts a value to the string navigation keys it by (JS `String(value)`), unlike Vega's `toString`, which maps '' and null to null.
+ * @param expression
+ * @returns string
+ */
+const toNavigationKey = (expression: string): string => `("" + ${expression})`;
 
 /** Ring corners for a single bar or whole stack treated as one shape: rounded metric end, flat base. */
 const getStaticFocusRingCorners = ({ hasSquareCorners, orientation }: BarSpecOptions): RectEncodeEntry => {
@@ -69,11 +83,11 @@ const getDynamicFocusRingCorners = (options: BarSpecOptions): RectEncodeEntry =>
 };
 
 export const getBarFocusRing = (options: BarSpecOptions): RectMark => {
-  const { color, colorScheme, dimension, name } = options;
-  const focusedItemId =
-    typeof color === 'string'
-      ? `datum.datum.${dimension} + "${NAVIGATION_ID_SEPARATOR}" + datum.datum.${color}`
-      : `datum.datum.${dimension}`;
+  const { colorScheme, dimension, name } = options;
+  // Keyed by the series id (every series facet joined), so series that share a color but differ in another facet stay distinct.
+  const dimensionKey = toNavigationKey(`datum.datum.${dimension}`);
+  // A bar without a series and with an empty dimension is keyed by the separator alone, as navigation keys it.
+  const focusedItemId = `isValid(datum.datum.${SERIES_ID}) ? ${dimensionKey} + "${NAVIGATION_ID_SEPARATOR}" + datum.datum.${SERIES_ID} : (${dimensionKey} || "${NAVIGATION_ID_SEPARATOR}")`;
   // Suppressed whenever any item is selected, since only one bar can be selected and its own selection ring shows instead.
   const isSelected = `isValid(${SELECTED_ITEM})`;
   return {
@@ -94,7 +108,7 @@ export const getBarFocusRing = (options: BarSpecOptions): RectMark => {
         x2: { signal: `datum.bounds.x2 + ${FOCUS_RING_OFFSET}` },
         y: { signal: `datum.bounds.y1 - ${FOCUS_RING_OFFSET}` },
         y2: { signal: `datum.bounds.y2 + ${FOCUS_RING_OFFSET}` },
-        opacity: [{ test: `${FOCUSED_ITEM} === ${focusedItemId} && !(${isSelected})`, value: 1 }, { value: 0 }],
+        opacity: [{ test: `${FOCUSED_ITEM} === (${focusedItemId}) && !(${isSelected})`, value: 1 }, { value: 0 }],
       },
     },
   };
@@ -106,6 +120,8 @@ export const getStackFocusRing = (options: BarSpecOptions): RectMark => {
   const { dimensionScaleKey, metricScaleKey } = getOrientationProperties(orientation);
   const dimStart = `scale('${dimensionScaleKey}', datum.${dimension}) - ${FOCUS_RING_OFFSET}`;
   const dimEnd = `scale('${dimensionScaleKey}', datum.${dimension}) + bandwidth('${dimensionScaleKey}') + ${FOCUS_RING_OFFSET}`;
+  const dimensionKey = toNavigationKey(`datum.${dimension}`);
+  const isFocusedDimension = `${FOCUSED_DIMENSION} === ${dimensionKey}`;
   const stackTop = `scale('${metricScaleKey}', datum.max_${metric}1)`;
   const baseline = `scale('${metricScaleKey}', 0)`;
   const update: RectEncodeEntry =
@@ -138,7 +154,7 @@ export const getStackFocusRing = (options: BarSpecOptions): RectMark => {
       },
       update: {
         ...update,
-        opacity: [{ test: `${FOCUSED_DIMENSION} === datum.${dimension}`, value: 1 }, { value: 0 }],
+        opacity: [{ test: isFocusedDimension, value: 1 }, { value: 0 }],
       },
     },
   };
@@ -154,6 +170,8 @@ export const getDodgedGroupFocusRing = (options: BarSpecOptions): RectMark => {
   const { dimensionScaleKey, metricScaleKey } = getOrientationProperties(orientation);
   const dimStart = `scale('${dimensionScaleKey}', datum.${dimension}) - ${FOCUS_RING_OFFSET}`;
   const dimEnd = `scale('${dimensionScaleKey}', datum.${dimension}) + bandwidth('${dimensionScaleKey}') + ${FOCUS_RING_OFFSET}`;
+  const dimensionKey = toNavigationKey(`datum.${dimension}`);
+  const isFocusedDimension = `${FOCUSED_DIMENSION} === ${dimensionKey}`;
   // A dual-metric-axis bar's last series renders on a secondary scale with its own domain (see
   // getMetricEncodings), so the ring must resolve each of the 4 primary/secondary min/max fields
   // getDodgedGroupAggregateData produces against its own scale — keep the field names here in sync
@@ -161,6 +179,8 @@ export const getDodgedGroupFocusRing = (options: BarSpecOptions): RectMark => {
   // group's ring anchored to the axis baseline, same as a real bar.
   const getScaledExtent = (bound: 'min' | 'max'): string => {
     const { primaryScale, secondaryScale } = getDualAxisScaleNames(metricScaleKey);
+    // A dodged-and-stacked group's extent is its stacks' extent, so it reads the stacked end values.
+    const extentField = isDodgedAndStacked(options) ? `${metric}1` : metric;
     const fields = isDualMetricAxis(options)
       ? [
           { scale: primaryScale, field: `min_${metric}_primary` },
@@ -169,8 +189,8 @@ export const getDodgedGroupFocusRing = (options: BarSpecOptions): RectMark => {
           { scale: secondaryScale, field: `max_${metric}_secondary` },
         ]
       : [
-          { scale: metricScaleKey, field: `min_${metric}` },
-          { scale: metricScaleKey, field: `max_${metric}` },
+          { scale: metricScaleKey, field: `min_${extentField}` },
+          { scale: metricScaleKey, field: `max_${extentField}` },
         ];
     const expressions = fields.map(
       ({ scale, field }) => `isValid(datum.${field}) ? scale('${scale}', datum.${field}) : scale('${scale}', 0)`
@@ -208,7 +228,7 @@ export const getDodgedGroupFocusRing = (options: BarSpecOptions): RectMark => {
       },
       update: {
         ...update,
-        opacity: [{ test: `${FOCUSED_DIMENSION} === datum.${dimension}`, value: 1 }, { value: 0 }],
+        opacity: [{ test: isFocusedDimension, value: 1 }, { value: 0 }],
       },
     },
   };
