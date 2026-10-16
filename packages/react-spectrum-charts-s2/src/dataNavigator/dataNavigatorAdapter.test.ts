@@ -11,7 +11,7 @@
  */
 import { RefObject } from 'react';
 
-import { fireEvent } from '@testing-library/react';
+import { fireEvent, waitFor } from '@testing-library/react';
 import { View } from 'vega';
 
 import {
@@ -23,13 +23,13 @@ import {
   HOVERED_ITEM,
   MARK_ID,
   SELECTED_ITEM,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 import { Datum, MarkBounds } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { getItemBounds, triggerPopover } from '../utils/markClickUtils';
-import { segmentId } from './buildBarStructure';
-import { NavigableChartType } from './buildChartStructure';
-import { attachDataNavigator } from './dataNavigatorAdapter';
+import { getItemBounds, triggerPopover } from '../utils/markClickUtils.js';
+import { segmentId } from './buildBarStructure.js';
+import { NavigableChartType } from './buildChartStructure.js';
+import { attachDataNavigator } from './dataNavigatorAdapter.js';
 
 jest.mock('../utils/markClickUtils', () => ({
   ...jest.requireActual('../utils/markClickUtils'),
@@ -330,6 +330,21 @@ describe('attachDataNavigator()', () => {
     tooltipCallback.mockClear();
     fireEvent.keyDown(focused(), { key: 'Escape', code: 'Escape' });
     expect(tooltipCallback).toHaveBeenCalledWith(undefined, undefined, undefined, null);
+  });
+
+  test('logs instead of rejecting when applying focus signals fails', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const error = new Error('runAsync failed');
+    (view.runAsync as jest.Mock).mockRejectedValue(error);
+    attach({ markName: 'bar0' });
+    entryButton().click();
+    fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+    await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error));
+
+    consoleSpy.mockClear();
+    fireEvent.keyDown(focused(), { key: 'Escape', code: 'Escape' });
+    await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error));
+    consoleSpy.mockRestore();
   });
 
   test('ArrowDown moves to the next bar, the same as ArrowRight', () => {
@@ -791,6 +806,20 @@ describe('attachDataNavigator()', () => {
       expect(lastTooltipValue()).not.toBeUndefined();
     });
 
+    test('logs instead of rejecting when the re-render after a mouseout clear fails', async () => {
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      attachWithMarkName();
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      const error = new Error('runAsync failed');
+      (view.runAsync as jest.Mock).mockRejectedValue(error);
+
+      simulateMouseoutClear('bar0_dimensionHoverArea_hoveredItem');
+
+      await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error));
+      consoleSpy.mockRestore();
+    });
+
     test('does nothing when no node is keyboard-focused', () => {
       attachWithMarkName();
       signal.mockClear();
@@ -1160,15 +1189,15 @@ describe('attachDataNavigator()', () => {
     const enterAxisRegion = () => {
       attachWithAxis();
       entryButton().click(); // chart root
-      fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' }); // chart root -> axis root
+      fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' }); // chart root -> axis root
     };
 
-    test('Right from the chart root clears the chart-region focus signal', () => {
+    test('Down from the chart root clears the chart-region focus signal', () => {
       enterAxisRegion();
       expect(signaledWith(FOCUSED_REGION, null)).toBe(true);
     });
 
-    test('Right from the chart root shows the axis focus ring', () => {
+    test('Down from the chart root shows the axis focus ring', () => {
       enterAxisRegion();
       expect(focusRing().style.display).toBe('block');
     });
@@ -1241,19 +1270,19 @@ describe('attachDataNavigator()', () => {
       expect(focusRing().style).toMatchObject({ left: '-6px', top: '94px', width: '152px', height: '32px' });
     });
 
-    test('Left from the axis root returns to the chart region', () => {
+    test('Up from the axis root returns to the chart region', () => {
       enterAxisRegion();
       signal.mockClear();
 
-      fireEvent.keyDown(focused(), { key: 'ArrowLeft', code: 'ArrowLeft' });
+      fireEvent.keyDown(focused(), { key: 'ArrowUp', code: 'ArrowUp' });
 
       expect(signaledWith(FOCUSED_REGION, 'chart')).toBe(true);
     });
 
-    test('Left from the axis root clears the axis focus ring', () => {
+    test('Up from the axis root clears the axis focus ring', () => {
       enterAxisRegion();
 
-      fireEvent.keyDown(focused(), { key: 'ArrowLeft', code: 'ArrowLeft' });
+      fireEvent.keyDown(focused(), { key: 'ArrowUp', code: 'ArrowUp' });
 
       expect(focusRing().style.display).toBe('none');
     });
@@ -1263,7 +1292,7 @@ describe('attachDataNavigator()', () => {
       axisLabelItems.length = 0; // no labels rendered, e.g. an empty/zero-width axis
       entryButton().click();
 
-      fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' });
+      fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
 
       expect(focusRing().style.display).toBe('none');
     });
@@ -1290,4 +1319,5 @@ describe('attachDataNavigator()', () => {
       expect(signal).toHaveBeenCalledWith('bar0_dimensionHoverArea_hoveredItem', data[0]);
     });
   });
+
 });

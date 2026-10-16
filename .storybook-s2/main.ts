@@ -1,14 +1,15 @@
+import { fileURLToPath } from 'node:url';
+
 import type { StorybookConfig } from '@storybook/react-webpack5';
 
 const config: StorybookConfig = {
   stories: [
-    '../packages/react-spectrum-charts-s2/src/**/*.story.mdx',
-    '../packages/react-spectrum-charts-s2/src/**/*.story.@(js|jsx|ts|tsx)',
+    '../packages/react-spectrum-charts-s2/src/stories/**/*.story.@(js|jsx|ts|tsx)',
   ],
 
   addons: [
     '@storybook/addon-links',
-    '@storybook/addon-essentials',
+    '@storybook/addon-docs',
     'storybook-dark-mode',
     '@storybook/addon-webpack5-compiler-babel',
   ],
@@ -23,6 +24,16 @@ const config: StorybookConfig = {
   ],
 
   webpackFinal(config) {
+    config.resolve ??= {};
+    // S2 packages are ESM with fully specified relative imports (`./foo.js`) that point at TypeScript sources.
+    config.resolve.extensionAlias = { ...config.resolve.extensionAlias, '.js': ['.ts', '.tsx', '.js'] };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@spectrum-charts/core-s2': fileURLToPath(new URL('../packages/core-s2/src', import.meta.url)),
+      '@spectrum-charts/vega-spec-builder-s2$': fileURLToPath(
+        new URL('../packages/vega-spec-builder-s2/index.ts', import.meta.url)
+      ),
+    };
     return config;
   },
 
@@ -33,5 +44,4 @@ const config: StorybookConfig = {
   },
 };
 
-module.exports = config;
-
+export default config;

@@ -11,10 +11,13 @@
  */
 import { TrendlineOptions } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { TrendlineProps } from '../types';
-import { childrenToOptions } from './childrenAdapter';
+import { TrendlineProps } from '../types/index.js';
+import { ChildrenToOptions } from './childOptions.types.js';
 
-export const getTrendlineOptions = ({ children, ...trendlineProps }: TrendlineProps): TrendlineOptions => {
+export const getTrendlineOptions = (
+  { children, ...trendlineProps }: TrendlineProps,
+  childrenToOptions: ChildrenToOptions
+): TrendlineOptions => {
   const { chartInspects, trendlineAnnotations } = childrenToOptions(children);
 
   return {

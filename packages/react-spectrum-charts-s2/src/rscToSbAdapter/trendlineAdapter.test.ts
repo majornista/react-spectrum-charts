@@ -11,26 +11,27 @@
  */
 import { createElement } from 'react';
 
-import { ChartInspect } from '../components/ChartInspect';
-import { TrendlineAnnotation } from '../pre-alpha';
-import { getTrendlineOptions } from './trendlineAdapter';
+import { ChartInspect } from '../components/ChartInspect/index.js';
+import { TrendlineAnnotation } from '../pre-alpha/index.js';
+import { childrenToOptions } from './childrenAdapter.js';
+import { getTrendlineOptions } from './trendlineAdapter.js';
 
 describe('getTrendlineOptions()', () => {
   it('should return all basic options', () => {
-    const options = getTrendlineOptions({});
+    const options = getTrendlineOptions({}, childrenToOptions);
     expect(options.chartInspects).toHaveLength(0);
     expect(options.trendlineAnnotations).toHaveLength(0);
   });
   it('should convert ChartInspect children to chartInspects array', () => {
-    const options = getTrendlineOptions({ children: [createElement(ChartInspect)] });
+    const options = getTrendlineOptions({ children: [createElement(ChartInspect)] }, childrenToOptions);
     expect(options.chartInspects).toHaveLength(1);
   });
   it('should convert trendline annotation children to trendlineAnnotations array', () => {
-    const options = getTrendlineOptions({ children: [createElement(TrendlineAnnotation)] });
+    const options = getTrendlineOptions({ children: [createElement(TrendlineAnnotation)] }, childrenToOptions);
     expect(options.trendlineAnnotations).toHaveLength(1);
   });
   it('should pass through included props', () => {
-    const options = getTrendlineOptions({ method: 'linear' });
+    const options = getTrendlineOptions({ method: 'linear' }, childrenToOptions);
     expect(options).toHaveProperty('method', 'linear');
   });
 });

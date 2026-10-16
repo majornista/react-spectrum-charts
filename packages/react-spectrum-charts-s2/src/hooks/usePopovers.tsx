@@ -11,19 +11,19 @@
  */
 import { createElement, useMemo } from 'react';
 
-import { ChartPopover } from '../components/ChartPopover';
-import { ChartChildElement, ChartPopoverElement, ChartPopoverProps } from '../types';
-import { getAllElements } from '../utils';
+import { ChartPopover } from '../components/ChartPopover/index.js';
+import { Donut } from '../pre-alpha/index.js';
+import { DefaultDonutContent, getDefaultDonutContent } from '../pre-alpha/components/Donut/DonutDialogContent.js';
+import { ChartChildElement, ChartPopoverElement, ChartPopoverProps, DonutElement } from '../types/index.js';
+import { getAllElements, getAllMarkElements } from '../utils/index.js';
+import { ChartContainer } from './ChartContainer.js';
 
 type MappedPopover = { name: string; element: ChartPopoverElement; parent?: string };
-
-const ChartContainer = ({ children }: { children: React.ReactNode }) => {
-  return <div>{children}</div>;
-};
-ChartContainer.displayName = 'ChartContainer';
+type MappedDonut = { name: string; element: DonutElement };
 
 export type PopoverDetail = {
   chartPopoverProps: ChartPopoverProps;
+  defaultDonutContent?: DefaultDonutContent;
   key: string;
   name: string;
   UNSAFE_highlightBy: ChartPopoverProps['UNSAFE_highlightBy'];
@@ -31,31 +31,32 @@ export type PopoverDetail = {
 };
 
 export default function usePopovers(children: ChartChildElement[]): PopoverDetail[] {
-  const popoverElements = useMemo(
-    () =>
-      getAllElements(
-        createElement(ChartContainer, undefined, children),
-        ChartPopover,
-        [],
-        undefined,
-        'Chart'
-      ) as MappedPopover[],
-    [children]
-  );
+  const { donutElements, popoverElements } = useMemo(() => {
+    const container = createElement(ChartContainer, undefined, children);
+    return {
+      donutElements: getAllMarkElements(container, Donut, []) as MappedDonut[],
+      popoverElements: getAllElements(container, ChartPopover, [], undefined, 'Chart') as MappedPopover[],
+    };
+  }, [children]);
 
   return useMemo(
     () =>
       popoverElements
-        .filter((popover) => popover.element.props.children)
+        .filter((popover) => popover.element.props.children || popover.parent === Donut.displayName)
         .map((popover, index) => {
+          const donut = donutElements.find(({ name }) => name === popover.name);
           return {
             chartPopoverProps: popover.element.props,
+            defaultDonutContent:
+              donut && !popover.element.props.children
+                ? getDefaultDonutContent(donut.name, donut.element.props)
+                : undefined,
             key: `${popover.name}Popover${index}`,
             name: popover.name,
             UNSAFE_highlightBy: popover.element.props.UNSAFE_highlightBy,
             parent: popover.parent,
           };
         }),
-    [popoverElements]
+    [donutElements, popoverElements]
   );
 }

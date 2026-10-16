@@ -14,7 +14,7 @@ import dataNavigator, { NodeObject, Structure, StructureOptions } from 'data-nav
 
 import { SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { addSiblingKeySynonyms, baseNavigationRules } from './navigationRules';
+import { addSiblingKeySynonyms, baseNavigationRules } from './navigationRules.js';
 
 /** Approximate tick count for a numerical axis; the live Vega scale may render a different count. */
 const APPROXIMATE_TICK_COUNT = 5;
@@ -58,7 +58,8 @@ const uniqueCategoricalValues = (data: SimpleData[], field: string): (string | n
     // Narrowed (not just null-checked) so String() below never risks Object's default stringification.
     if (typeof value !== 'string' && typeof value !== 'number') continue;
     const key = String(value);
-    if (seen.has(key)) continue;
+    // An empty label renders nothing to read, and an empty id would break data-navigator's structure.
+    if (key === '' || seen.has(key)) continue;
     seen.add(key);
     values.push(value);
   }

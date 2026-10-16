@@ -9,11 +9,15 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import React, { FC } from 'react';
+import React, { FC, ReactNode } from 'react';
 
-import GraphBarVertical from '@spectrum-icons/workflow/GraphBarVertical';
+import type { IconProps } from '@react-spectrum/s2';
+import ChartBarVertIcon from '@react-spectrum/s2/icons/ChartBarVert';
 
 import './EmptyState.css';
+
+// @react-spectrum/s2 icon typings are CommonJS-only, so NodeNext types this default import as the module object.
+const ChartBarVert = ChartBarVertIcon as unknown as (props: IconProps) => ReactNode;
 
 export interface EmptyStateProps {
   height?: number;
@@ -23,7 +27,7 @@ export interface EmptyStateProps {
 const EmptyState: FC<EmptyStateProps> = ({ height, text }) => {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height }}>
-      <GraphBarVertical size="XXL" UNSAFE_className="EmptyState-icon" />
+      <ChartBarVert UNSAFE_className="EmptyState-icon" UNSAFE_style={{ width: 72, height: 72 }} />
       {Boolean(text) && <span className="EmptyState-text">{text}</span>}
     </div>
   );

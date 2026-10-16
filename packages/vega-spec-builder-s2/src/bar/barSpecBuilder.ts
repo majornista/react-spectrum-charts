@@ -33,18 +33,18 @@ import {
   STACK_ID,
   TIME,
   TRELLIS_PADDING,
-} from '@spectrum-charts/constants';
-import { toCamelCase } from '@spectrum-charts/utils';
+} from '@spectrum-charts/core-s2/constants';
+import { toCamelCase } from '@spectrum-charts/core-s2/utils';
 
-import { addPopoverData, getPopovers } from '../chartPopover/chartPopoverUtils';
+import { addPopoverData, getPopovers } from '../chartPopover/chartPopoverUtils.js';
 import {
   addInspectData,
   addInspectSignals,
   getGroupIdTransform,
   getInspects,
   isHighlightedByGroup,
-} from '../chartInspect/chartInspectUtils';
-import { addTimeTransform, getTableData, getTransformSort } from '../data/dataUtils';
+} from '../chartInspect/chartInspectUtils.js';
+import { addTimeTransform, getTableData, getTransformSort } from '../data/dataUtils.js';
 import {
   addHoverAnimLastChangeData,
   addHoverAnimationSignals,
@@ -52,8 +52,8 @@ import {
   getHoverFractionData,
   getHoverSeriesFractionData,
   getHoverTargetData,
-} from '../marks/hoverAnimationUtils';
-import { getInteractiveMarkName, isInteractive } from '../marks/markUtils';
+} from '../marks/hoverAnimationUtils.js';
+import { getInteractiveMarkName, isInteractive } from '../marks/markUtils.js';
 import {
   addDomainFields,
   addFieldToFacetScaleDomain,
@@ -62,24 +62,24 @@ import {
   getMetricScale,
   getScaleIndexByName,
   getScaleIndexByType,
-} from '../scale/scaleSpecBuilder';
-import { getDualAxisScaleNames } from '../scale/scaleUtils';
+} from '../scale/scaleSpecBuilder.js';
+import { getDualAxisScaleNames } from '../scale/scaleUtils.js';
 import {
   addHoveredItemSignal,
   getFirstRscSeriesIdSignal,
   getGenericValueSignal,
   getLastRscSeriesIdSignal,
-} from '../signal/signalSpecBuilder';
+} from '../signal/signalSpecBuilder.js';
 import {
   addUserMetaAnimatedMark,
   addUserMetaDivergingBarMark,
   addUserMetaInteractiveMark,
   getFacetsFromOptions,
-} from '../specUtils';
-import { getBarDirectLabelMarks, getBarDirectLabelSpecOptions } from '../barDirectLabel/barDirectLabelUtils';
-import { addTrendlineData, getTrendlineMarks, setTrendlineSignals } from '../trendline';
-import { BarOptions, BarSpecOptions, ChartData, ColorScheme, HighlightedItem, ScSpec } from '../types';
-import { getChartFocusRing } from './barFocusRingUtils';
+} from '../specUtils.js';
+import { getBarDirectLabelMarks, getBarDirectLabelSpecOptions } from '../barDirectLabel/barDirectLabelUtils.js';
+import { addTrendlineData, getTrendlineMarks, setTrendlineSignals } from '../trendline/index.js';
+import { BarOptions, BarSpecOptions, ChartData, ColorScheme, HighlightedItem, ScSpec } from '../types/index.js';
+import { getChartFocusRing, getDodgedGroupFocusRing } from './barFocusRingUtils.js';
 import {
   getBarAnimIdField,
   getBarHoverRules,
@@ -90,10 +90,11 @@ import {
   getScaleValues,
   isDodgedAndStacked,
   isDualMetricAxis,
-} from './barUtils';
-import { getDodgedMarks } from './dodgedBarUtils';
-import { getDodgedAndStackedBarMark, getStackedBarMarks } from './stackedBarUtils';
-import { addTrellisScale, getTrellisGroupMark, isTrellised } from './trellisedBarUtils';
+} from './barUtils.js';
+import { getDodgedMarks } from './dodgedBarUtils.js';
+import { getDodgedAndStackedBarMark, getStackedBarMarks } from './stackedBarUtils.js';
+import { isTrellised } from './trellisPropertyUtils.js';
+import { addTrellisScale, getTrellisGroupMark } from './trellisedBarUtils.js';
 
 export const addBar = produce<
   ScSpec,
@@ -430,6 +431,8 @@ const getStackFields = ({ trellis, color, dimension, lineType, opacity, type }: 
 export const getDodgedGroupAggregateData = (options: BarSpecOptions): Data => {
   const { dimension, metric, name } = options;
   const dualMetricAxis = isDualMetricAxis(options);
+  // Keep in sync with getDodgedGroupFocusRing: a dodged-and-stacked group spans its stacks' end values.
+  const extentField = isDodgedAndStacked(options) ? `${metric}1` : metric;
   // A dual-metric-axis bar's last series renders against a secondary scale with its own domain (see
   // getMetricEncodings), so its metric can't be aggregated together with the rest — null out whichever
   // side a row doesn't belong to and aggregate both fields, so getDodgedGroupFocusRing can resolve each
@@ -458,7 +461,7 @@ export const getDodgedGroupAggregateData = (options: BarSpecOptions): Data => {
         groupby: [dimension],
         fields: dualMetricAxis
           ? [`${metric}_primary`, `${metric}_primary`, `${metric}_secondary`, `${metric}_secondary`]
-          : [metric, metric],
+          : [extentField, extentField],
         ops: dualMetricAxis ? ['min', 'max', 'min', 'max'] : ['min', 'max'],
       },
     ],
@@ -577,6 +580,7 @@ export const addMarks = produce<Mark[], [BarSpecOptions]>((marks, options) => {
   const barMarks: Mark[] = [];
   if (isDodgedAndStacked(options)) {
     barMarks.push(getDodgedAndStackedBarMark(options));
+    if (options.accessibleNavigation) barMarks.push(getDodgedGroupFocusRing(options));
   } else if (type === 'stacked') {
     barMarks.push(...getStackedBarMarks(options));
   } else {

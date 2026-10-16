@@ -15,13 +15,14 @@ import { Config, Padding, Renderers, Spec, View, expressionFunction } from 'vega
 import embed from 'vega-embed';
 import { Options as TooltipOptions } from 'vega-tooltip';
 
-import { TABLE } from '@spectrum-charts/constants';
-import { getLocale } from '@spectrum-charts/locales';
+import { TABLE } from '@spectrum-charts/core-s2/constants';
+import { getLocale } from '@spectrum-charts/core-s2/locales';
+import { jsonClone } from '@spectrum-charts/core-s2/utils';
 import { ChartData, UserMeta, applyUserMetaConfigPatches, getVegaEmbedOptions } from '@spectrum-charts/vega-spec-builder-s2';
 
-import { useDebugSpec } from './hooks/useDebugSpec';
-import { extractValues, isVegaData } from './hooks/useSpec';
-import { ChartProps } from './types';
+import { useDebugSpec } from './hooks/useDebugSpec.js';
+import { extractValues, isVegaData } from './hooks/useSpec.js';
+import { ChartProps } from './types/index.js';
 
 // Register a custom expression function that returns the full container width (including axis space).
 // `view._viewWidth` is the container width minus spec-level padding; adding padding back gives the
@@ -93,7 +94,7 @@ export const VegaChart: FC<VegaChartProps> = ({
 
   // Need to de a deep copy of the data because vega tries to transform the data
   const chartData = useMemo(() => {
-    const clonedData = structuredClone(data);
+    const clonedData = jsonClone(data);
 
     // We received a full Vega data array with potentially multiple dataset objects
     if (isVegaData(clonedData)) {
@@ -123,7 +124,7 @@ export const VegaChart: FC<VegaChartProps> = ({
 
   useEffect(() => {
     if (width && height && containerRef.current) {
-      const specCopy = structuredClone(spec);
+      const specCopy = jsonClone(spec);
       const tableData = specCopy.data?.find((d) => d.name === TABLE);
       if (tableData && 'values' in tableData) {
         tableData.values = chartData.table;

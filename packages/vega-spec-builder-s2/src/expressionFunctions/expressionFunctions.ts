@@ -9,13 +9,14 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { FormatLocaleDefinition, formatLocale } from 'd3-format';
+import { formatLocale } from 'd3-format';
 import { FontWeight, Locale, NumberLocale, TimeLocale } from 'vega';
 
-import { LocaleCode, NumberLocaleCode, TimeLocaleCode, getLocale, numberLocales } from '@spectrum-charts/locales';
-import { ADOBE_CLEAN_FONT } from '@spectrum-charts/themes';
+import { DONUT_LABEL_COLLISION_GAP } from '@spectrum-charts/core-s2/constants';
+import { LocaleCode, NumberLocaleCode, TimeLocaleCode, getLocale, numberLocales } from '@spectrum-charts/core-s2/locales';
+import { ADOBE_CLEAN_FONT } from '@spectrum-charts/core-s2/tokens';
 
-import { NumberFormat } from '../types';
+import { NumberFormat } from '../types/index.js';
 
 export interface LabelDatum {
   index: number;
@@ -39,6 +40,7 @@ export const getExpressionFunctions = (
     formatHorizontalTimeAxisLabels: formatHorizontalTimeAxisLabels(),
     formatVerticalAxisTimeLabels: formatVerticalAxisTimeLabels(),
     getLabelWidth,
+    isDonutLabelVisible,
     truncateText,
   };
 };
@@ -48,7 +50,7 @@ export const getExpressionFunctions = (
  * @param numberLocale
  * @returns formatted string
  */
-export const formatShortNumber = (numberLocale?: string | FormatLocaleDefinition) => {
+export const formatShortNumber = (numberLocale?: string | NumberLocale) => {
   const locale = typeof numberLocale === 'string' ? numberLocale : navigator.language;
   const customDecimalSymbol = typeof numberLocale === 'object' ? numberLocale.decimal : undefined;
   return (value: number) => {
@@ -66,12 +68,26 @@ export const formatShortNumber = (numberLocale?: string | FormatLocaleDefinition
 };
 
 /**
+ * Formats a percent of total followed by the short number value, e.g. `65.2% (23K)`.
+ * @param locale
+ * @returns formatted string
+ */
+export const formatPercentWithValue = (locale: Parameters<typeof getLocale>[0] = 'en-US') => {
+  const { number: numberLocale } = getLocale(locale);
+  const localeCode = typeof locale === 'string' ? locale : locale?.number;
+  const formatPercent = formatLocale((numberLocale ?? numberLocales['en-US'])).format('.1%');
+  // matches getTextNumberFormat's 'shortNumber' so the value reads the same as the segment label
+  const formatValue = formatShortNumber(localeCode);
+  return (percent: number, value: number) => `${formatPercent(percent)} (${formatValue(value)})`;
+};
+
+/**
  * Formats currency values using a currency specific locale and currency code for the position and
  * type of currency symbol.
  * Applies thousands and decimal separators based on the numberFormat.
  * @returns string
  */
-export const formatLocaleCurrency = (numberLocale: FormatLocaleDefinition = numberLocales['en-US']) => {
+export const formatLocaleCurrency = (numberLocale: NumberLocale = numberLocales['en-US']) => {
   return ({ value }: LabelDatum, currencyLocale: string, currencyCode: string, numberFormat: NumberFormat) => {
     if (typeof value === 'string') return value;
 
@@ -136,7 +152,7 @@ export const formatVerticalAxisTimeLabels = () => {
  * @param numberLocale
  * @returns formatted sting (HH:MM:SS)
  */
-export const formatTimeDurationLabels = (numberLocale: FormatLocaleDefinition = numberLocales['en-US']) => {
+export const formatTimeDurationLabels = (numberLocale: NumberLocale = numberLocales['en-US']) => {
   const d3 = formatLocale(numberLocale);
   // 0 padded, minimum 2 digits, thousands separator, integer format
   const zeroPaddedFormat = d3.format('02,d');
@@ -187,6 +203,85 @@ const getLabelWidth = (text: string, fontWeight: FontWeight = 'bold', fontSize: 
   return context.measureText(text).width;
 };
 
+/**
+ * Gets the smallest top y of a donut label's collision boxes.
+ * @param candidate
+ * @param collisionBoxesField
+ * @returns top y in pixels
+ */
+const getTopY = (candidate: Record<string, unknown>, collisionBoxesField: string): number =>
+  Math.min(...(candidate[collisionBoxesField] as number[][]).map(([, , topY]) => topY));
+
+/**
+ * Checks whether a donut label candidate is the hovered item.
+ * @param candidate
+ * @param idField
+ * @param hoveredId
+ * @returns whether the candidate is hovered
+ */
+const isHovered = (candidate: Record<string, unknown>, idField: string, hoveredId?: unknown): boolean =>
+  hoveredId !== undefined && hoveredId !== null && candidate[idField] === hoveredId;
+
+/**
+ * Keeps fixed-position donut labels in priority order when their rendered blocks do not overlap.
+ * @param data
+ * @param datum
+ * @param hemisphereField
+ * @param collisionBoxesField
+ * @param priorityField
+ * @param idField
+ * @param hoveredId
+ * @returns whether the label should be visible
+ */
+export const isDonutLabelVisible = (
+  data: Record<string, unknown>[],
+  datum: Record<string, unknown>,
+  hemisphereField: string,
+  collisionBoxesField: string,
+  priorityField: string,
+  idField: string,
+  hoveredId?: unknown
+): boolean => {
+  const gap = DONUT_LABEL_COLLISION_GAP;
+  const hemisphere = datum[hemisphereField];
+  const candidates = data
+    .filter((candidate) => candidate[hemisphereField] === hemisphere)
+    .sort((a, b) => {
+      const hoveredDifference = Number(isHovered(b, idField, hoveredId)) - Number(isHovered(a, idField, hoveredId));
+      if (hoveredDifference) return hoveredDifference;
+      const priorityDifference = Number(b[priorityField]) - Number(a[priorityField]);
+      return priorityDifference || getTopY(a, collisionBoxesField) - getTopY(b, collisionBoxesField);
+    });
+  const accepted: Record<string, unknown>[] = [];
+
+  for (const candidate of candidates) {
+    const collisionBoxes = candidate[collisionBoxesField] as number[][];
+    const overlaps = accepted.some((visibleCandidate) => {
+      const visibleCollisionBoxes = visibleCandidate[collisionBoxesField] as number[][];
+      return collisionBoxes.some(([leftX, rightX, topY, bottomY]) =>
+        visibleCollisionBoxes.some(
+          ([visibleLeftX, visibleRightX, visibleTopY, visibleBottomY]) =>
+            leftX < visibleRightX + gap &&
+            rightX > visibleLeftX - gap &&
+            topY < visibleBottomY + gap &&
+            bottomY > visibleTopY - gap
+        )
+      );
+    });
+    const isDatum =
+      candidate === datum ||
+      (candidate[idField] !== undefined && datum[idField] !== undefined && candidate[idField] === datum[idField]);
+    if (overlaps) {
+      if (isDatum) return false;
+      continue;
+    }
+    accepted.push(candidate);
+    if (isDatum) return true;
+  }
+
+  return false;
+};
+
 const truncateText = (text: string, maxWidth: number, fontWeight: FontWeight = 'normal', fontSize: number = 12) => {
   maxWidth = maxWidth - 4;
   const textWidth = getLabelWidth(text, fontWeight, fontSize);
@@ -209,5 +304,6 @@ export const expressionFunctions = {
   formatHorizontalTimeAxisLabels: formatHorizontalTimeAxisLabels(),
   formatVerticalAxisTimeLabels: formatVerticalAxisTimeLabels(),
   getLabelWidth,
+  isDonutLabelVisible,
   truncateText,
 };

@@ -32,29 +32,31 @@ import {
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
   FOCUSED_REGION,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 import { ChartHandle, Datum, Orientation, SimpleData, SymbolSize, getChartConfig } from '@spectrum-charts/vega-spec-builder-s2';
 
 import './Chart.css';
-import { VegaChart } from './VegaChart';
-import { Axis } from './components/Axis';
-import { ChartActionBarDialog } from './components/ChartActionBar/ChartActionBarDialog';
-import { ChartInspect } from './components/ChartInspect';
-import { Legend } from './components/Legend';
-import { AxisRegionOptions } from './dataNavigator/buildChartStructure';
-import { isDualMetricAxisNavigation } from './dataNavigator/buildBarStructure';
-import { Navigator } from './dataNavigator/Navigator';
-import { getNavigableChartType } from './dataNavigator/navigableMarks';
-import { useChartContext } from './context/RscChartContext';
-import useActionBars from './hooks/useActionBars';
-import useChartImperativeHandle from './hooks/useChartImperativeHandle';
-import { useChartInteractions } from './hooks/useChartInteractions';
-import useMarkOnClickDetails from './hooks/useMarkOnClickDetails';
-import usePopovers, { PopoverDetail } from './hooks/usePopovers';
-import useSpec from './hooks/useSpec';
-import useSpecProps from './hooks/useSpecProps';
-import { ChartChildElement, RscChartProps } from './types';
-import { clearHoverSignals, sanitizeMarkChildren, sanitizeRscChartChildren, setSelectedSignals, shouldClearHoverSignalsOnClose } from './utils';
+import { VegaChart } from './VegaChart.js';
+import { DonutDialogContent, getDonutSwatchColor } from './pre-alpha/components/Donut/DonutDialogContent.js';
+import { Axis } from './components/Axis/index.js';
+import { ChartActionBarDialog } from './components/ChartActionBar/ChartActionBarDialog.js';
+import { ChartInspect } from './components/ChartInspect/index.js';
+import { Legend } from './components/Legend/index.js';
+import { AxisRegionOptions } from './dataNavigator/buildChartStructure.js';
+import { getBarSeriesFields } from './dataNavigator/barSeries.js';
+import { isDualMetricAxisNavigation } from './dataNavigator/buildBarStructure.js';
+import { Navigator } from './dataNavigator/Navigator.js';
+import { getNavigableChartType } from './dataNavigator/navigableMarks.js';
+import { useChartContext } from './context/RscChartContext.js';
+import useActionBars from './hooks/useActionBars.js';
+import useChartImperativeHandle from './hooks/useChartImperativeHandle.js';
+import { useChartInteractions } from './hooks/useChartInteractions.js';
+import useMarkOnClickDetails from './hooks/useMarkOnClickDetails.js';
+import usePopovers, { PopoverDetail } from './hooks/usePopovers.js';
+import useSpec from './hooks/useSpec.js';
+import useSpecProps from './hooks/useSpecProps.js';
+import { ChartChildElement, RscChartProps } from './types/index.js';
+import { clearHoverSignals, sanitizeMarkChildren, sanitizeRscChartChildren, setSelectedSignals, shouldClearHoverSignalsOnClose } from './utils/index.js';
 
 /** The `title` prop of the Axis child at the given `position`, if one exists. */
 const getAxisTitleAtPosition = (sanitizedChildren: ChartChildElement[], position: string): string | undefined =>
@@ -70,6 +72,8 @@ interface ChartDialogProps {
   setIsPopoverOpen: (isOpen: boolean) => void;
   popover: PopoverDetail;
   idKey: string;
+  colorScheme: RscChartProps['colorScheme'];
+  locale: RscChartProps['locale'];
   specSignalNames: ReadonlySet<string>;
 }
 
@@ -203,12 +207,17 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
         orientation?: Orientation;
       }
     | undefined;
-  const navColor = typeof navFields?.color === 'string' ? navFields.color : undefined;
-  const navColorOverride = typeof navFields?.colorOverride === 'string' ? navFields.colorOverride : undefined;
   const navLineType = navFields?.lineType;
   const navOpacity = navFields?.opacity;
-  const navTrellis = navFields?.trellis;
   const navType = navFields?.type;
+  // Every field dividing the bar into series (color, lineType, opacity, dual facets), mirroring the chart's series id.
+  const navSeries = useMemo(
+    () => getBarSeriesFields({ color: navFields?.color, lineType: navLineType, opacity: navOpacity, type: navType }),
+    [navFields?.color, navLineType, navOpacity, navType]
+  );
+  const navColor = navSeries.color;
+  const navColorOverride = typeof navFields?.colorOverride === 'string' ? navFields.colorOverride : undefined;
+  const navTrellis = navFields?.trellis;
   const navDualMetricAxis = navFields?.dualMetricAxis;
   const navOrientation: Orientation = navFields?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
   const markName = navFields?.name ?? (navChartType ? `${navChartType}0` : undefined);
@@ -228,10 +237,14 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
     const metricTitle = titleAt(isHorizontal ? 'bottom' : 'left');
     const labels: Record<string, string> = {};
     if (dimensionTitle) labels[navFields?.dimension ?? DEFAULT_CATEGORICAL_DIMENSION] = dimensionTitle;
-    if (navColor && (legendTitle || dimensionTitle || metricTitle)) labels[navColor] = legendTitle ?? navColor;
+    if (navColor && (legendTitle || dimensionTitle || metricTitle)) {
+      labels[navColor] = legendTitle ?? navColor;
+      // The other series fields (e.g. a time-comparison period) tell series apart too, so they're read under their own names.
+      for (const field of navSeries.seriesFields) labels[field] ??= field;
+    }
     if (metricTitle) labels[navFields?.metric ?? DEFAULT_METRIC] = metricTitle;
     return labels;
-  }, [sanitizedChildren, navOrientation, navFields?.dimension, navFields?.metric, navColor, legendTitle]);
+  }, [sanitizedChildren, navOrientation, navFields?.dimension, navFields?.metric, navColor, navSeries, legendTitle]);
 
   const navMetricTitleBySeries = useMemo(() => {
     // Mirrors vega-spec-builder-s2's isDualMetricAxis (barUtils.ts) — keep the two in sync.
@@ -365,6 +378,9 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             data={data as SimpleData[]}
             dimension={navFields?.dimension}
             color={navColor}
+            seriesFields={navSeries.seriesFields}
+            dodgeFields={navSeries.dodgeFields}
+            stackFields={navSeries.stackFields}
             type={navFields?.type}
             colorOverride={navColorOverride}
             locale={typeof locale === 'string' ? locale : undefined}
@@ -396,6 +412,8 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
           setIsPopoverOpen={setIsPopoverOpen}
           popover={popover}
           idKey={idKey}
+          colorScheme={colorScheme}
+          locale={locale}
           specSignalNames={specSignalNames}
         />
       ))}
@@ -414,7 +432,15 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
 };
 RscChart.displayName = 'RscChart';
 
-const ChartDialog = ({ popover, setIsPopoverOpen, targetElement, idKey, specSignalNames }: ChartDialogProps) => {
+const ChartDialog = ({
+  popover,
+  setIsPopoverOpen,
+  targetElement,
+  idKey,
+  colorScheme,
+  locale,
+  specSignalNames,
+}: ChartDialogProps) => {
   const { chartView, selectedData, selectedDataName, keyboardPopoverComponentName } = useChartContext();
   const [renderDatum, setRenderDatum] = useState<Datum | null>(null);
   const [isOpen, setIsOpen] = useState(false);
@@ -499,6 +525,21 @@ const ChartDialog = ({ popover, setIsPopoverOpen, targetElement, idKey, specSign
   );
 
   const close = useCallback(() => handleOpenChange(false), [handleOpenChange]);
+  const activeDatum = renderDatum?.[COMPONENT_NAME] === name ? renderDatum : null;
+  const { defaultDonutContent } = popover;
+  const content =
+    activeDatum && defaultDonutContent ? (
+      <DonutDialogContent
+        colorKey={defaultDonutContent.colorKey}
+        metricKey={defaultDonutContent.metricKey}
+        percentKey={defaultDonutContent.percentKey}
+        datum={activeDatum}
+        color={getDonutSwatchColor(chartView.current, defaultDonutContent, activeDatum, idKey, colorScheme)}
+        locale={locale}
+      />
+    ) : (
+      activeDatum && children?.(activeDatum, close)
+    );
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -543,7 +584,7 @@ const ChartDialog = ({ popover, setIsPopoverOpen, targetElement, idKey, specSign
       >
         <div data-testid="rsc-popover" style={popoverStyle}>
           <div data-testid="rsc-popover-content" className="rsc-popover-content" style={{ margin: contentMargin ?? 12 }}>
-            {renderDatum && renderDatum[COMPONENT_NAME] === name && children?.(renderDatum, close)}
+            {content}
           </div>
         </div>
       </Popover>

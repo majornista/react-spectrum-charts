@@ -9,7 +9,7 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { buildAxisDescription, buildAxisStructure } from './buildAxisStructure';
+import { buildAxisDescription, buildAxisStructure } from './buildAxisStructure.js';
 
 const data = [
   { browser: 'Chrome', downloads: 27000 },
@@ -36,6 +36,12 @@ describe('buildAxisStructure()', () => {
       const { structure } = buildAxisStructure({ data: stackedData, field: 'browser', type: 'categorical' });
       const leaves = Object.values(structure.nodes).filter((node) => node.dimensionLevel == null);
       expect(leaves).toHaveLength(2);
+    });
+
+    test('skips an empty-string value, which renders no label', () => {
+      const { structure } = buildAxisStructure({ data: [{ browser: '' }, { browser: 'Chrome' }], field: 'browser', type: 'categorical' });
+      const leaves = Object.values(structure.nodes).filter((node) => node.dimensionLevel == null);
+      expect(leaves.map((node) => node.id)).toEqual(['Chrome']);
     });
 
     test('returns the dimension root as the entry point', () => {

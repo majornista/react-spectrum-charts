@@ -49,22 +49,23 @@ import {
   DIRECT_LABEL_FONT_SIZE_S,
   DIRECT_LABEL_FONT_SIZE_M,
   DIRECT_LABEL_FONT_SIZE_L,
-} from '@spectrum-charts/constants';
-import { colorSchemes, getS2ColorValue } from '@spectrum-charts/themes';
+} from '@spectrum-charts/core-s2/constants';
+import { colorSchemes, getS2ColorValue } from '@spectrum-charts/core-s2/tokens';
+import { jsonClone } from '@spectrum-charts/core-s2/utils';
 
-import { addArea } from './area/areaSpecBuilder';
-import { addAxis } from './axis/axisSpecBuilder';
-import { addBar } from './bar/barSpecBuilder';
-import { addBullet } from './bullet/bulletSpecBuilder';
-import { addCombo } from './combo/comboSpecBuilder';
-import { getSeriesIdTransform } from './data/dataUtils';
-import { addDonut } from './donut/donutSpecBuilder';
-import { getLegendHighlightSignals, setHoverOpacityForMarks, setHoverStrokeWidthForMarks } from './legend/legendHighlightUtils';
-import { addLegend } from './legend/legendSpecBuilder';
-import { addLine } from './line/lineSpecBuilder';
-import { getOrdinalScale } from './scale/scaleSpecBuilder';
-import { addScatter } from './scatter/scatterSpecBuilder';
-import { getGenericValueSignal } from './signal/signalSpecBuilder';
+import { addArea } from './area/areaSpecBuilder.js';
+import { addAxis } from './axis/axisSpecBuilder.js';
+import { addBar } from './bar/barSpecBuilder.js';
+import { addBullet } from './bullet/bulletSpecBuilder.js';
+import { addCombo } from './combo/comboSpecBuilder.js';
+import { getSeriesIdTransform } from './data/dataUtils.js';
+import { addDonut } from './donut/donutSpecBuilder.js';
+import { getLegendHighlightSignals, setHoverOpacityForMarks, setHoverStrokeWidthForMarks } from './legend/legendHighlightUtils.js';
+import { addLegend } from './legend/legendSpecBuilder.js';
+import { addLine } from './line/lineSpecBuilder.js';
+import { getOrdinalScale } from './scale/scaleSpecBuilder.js';
+import { addScatter } from './scatter/scatterSpecBuilder.js';
+import { getGenericValueSignal } from './signal/signalSpecBuilder.js';
 import {
   getFacetsFromScales,
   getLineWidthPixelsFromLineWidth,
@@ -73,8 +74,8 @@ import {
   getSymbolWidthFromRscSymbolSize,
   getVegaSymbolSizeFromRscSymbolSize,
   initializeSpec,
-} from './specUtils';
-import { addTitle } from './title/titleSpecBuilder';
+} from './specUtils.js';
+import { addTitle } from './title/titleSpecBuilder.js';
 import {
   ChartColors,
   ChartOptions,
@@ -90,8 +91,8 @@ import {
   ScSpec,
   SymbolShapes,
   SymbolSize,
-} from './types';
-import { addVenn } from './venn/vennSpecBuilder';
+} from './types/index.js';
+import { addVenn } from './venn/vennSpecBuilder.js';
 
 /** True for an axis repositioned to its opposing scale's zero line (its `offset` is a `scale(…, 0)` signal). */
 const isDivergingAxis = (axis: Axis): boolean => {
@@ -182,7 +183,7 @@ export function buildSpec({
         return addCombo(acc, { ...mark, ...specOptions, index: comboCount });
       case 'donut':
         donutCount++;
-        return addDonut(acc, { ...mark, ...specOptions, index: donutCount });
+        return addDonut(acc, { ...mark, ...specOptions, index: donutCount, data });
       case 'line':
         lineCount++;
         return addLine(acc, { ...mark, ...specOptions, index: lineCount, data });
@@ -226,7 +227,7 @@ export function buildSpec({
   }
 
   // copy the spec so we don't mutate the original
-  spec = JSON.parse(JSON.stringify(spec));
+  spec = jsonClone(spec);
   spec.data = addData(spec.data ?? [], { facets: getFacetsFromScales(spec.scales) });
 
   // sibling axes paint in array order, so move the diverging axis last or a later grid axis paints over its labels
@@ -243,7 +244,7 @@ export function buildSpec({
   // clear out all scales that don't have any fields on the domain
   spec = removeUnusedScales(spec);
 
-  return JSON.parse(JSON.stringify(spec));
+  return structuredClone(spec);
 }
 
 export const removeUnusedScales = produce<ScSpec>((spec) => {

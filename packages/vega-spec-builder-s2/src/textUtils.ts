@@ -11,8 +11,8 @@
  */
 import { TextValueRef } from 'vega';
 
-import { getD3FormatSpecifierFromNumberFormat } from './specUtils';
-import { NumberFormat } from './types';
+import { getD3FormatSpecifierFromNumberFormat } from './specUtils.js';
+import { NumberFormat } from './types/index.js';
 
 /**
  * gets the number format tests and signals based on the numberFormat
@@ -35,7 +35,7 @@ export const getTextNumberFormat = (
     return [
       {
         test: `${test} && abs(datum['${datumProperty}']) >= 1000`,
-        signal: `upper(replace(format(datum['${datumProperty}'], '$.3~s'), /(\\d+)G/, '$1B'))`,
+        signal: String.raw`upper(replace(format(datum['${datumProperty}'], '$.3~s'), /(\d+)G/, '$1B'))`,
       },
       {
         test,

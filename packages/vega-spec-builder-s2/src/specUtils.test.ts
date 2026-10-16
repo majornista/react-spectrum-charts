@@ -21,11 +21,11 @@ import {
   ROUNDED_SQUARE_PATH,
   TABLE,
   VISIBILITY_OFF_PATH,
-} from '@spectrum-charts/constants';
+} from '@spectrum-charts/core-s2/constants';
 import {
   getSpectrum2VegaConfig,
   spectrum2Colors,
-} from '@spectrum-charts/themes';
+} from '@spectrum-charts/core-s2/tokens';
 
 import {
   addUserMetaInteractiveMark,
@@ -40,7 +40,7 @@ import {
   getPathFromSymbolShape,
   getStrokeDashFromLineType,
   getVegaSymbolSizeFromRscSymbolSize,
-} from './specUtils';
+} from './specUtils.js';
 
 const defaultColorScale: OrdinalScale = {
   name: COLOR_SCALE,
@@ -223,6 +223,7 @@ describe('getChartConfig()', () => {
     // S2 package always uses Spectrum 2 theming
     expect(getChartConfig(undefined, 'light')).toEqual(getSpectrum2VegaConfig('light'));
     const mergedConfig = getChartConfig({ axis: { labelFontSize: 12 } }, 'light');
+    expect(mergedConfig.axis).toHaveProperty('labelFontSize', 12);
     expect(mergedConfig.axis).toHaveProperty('domainWidth', 1);
     expect(mergedConfig.axis).toHaveProperty('domainColor', s2colors['gray-800']);
   });

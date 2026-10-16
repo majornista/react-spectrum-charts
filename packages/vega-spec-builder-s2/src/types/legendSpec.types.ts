@@ -9,8 +9,8 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { ColorScheme, HighlightedItem } from './chartSpec.types';
-import { ChartPopoverOptions } from './dialogs/chartPopoverSpec.types';
+import { ColorScheme, HighlightedItem } from './chartSpec.types.js';
+import { ChartPopoverOptions } from './dialogs/chartPopoverSpec.types.js';
 import {
   ColorFacet,
   FacetRef,
@@ -20,7 +20,7 @@ import {
   PartiallyRequired,
   Position,
   SymbolShapeFacet,
-} from './specUtil.types';
+} from './specUtil.types.js';
 
 export type LegendDescription = { seriesName: string; description: string; title?: string };
 export type LegendLabel = { seriesName: string | number; label: string; maxLength?: number };
@@ -30,7 +30,7 @@ export interface LegendOptions {
    * Alignment of the legend along its main axis.
    * For horizontal legends (bottom/top): start=left, middle=center, end=right.
    * For vertical legends (left/right): start=top, middle=center, end=bottom.
-   * @default 'middle'
+   * @default 'start' for bottom/top legends, 'middle' for left/right legends
    */
   align?: 'start' | 'middle' | 'end';
   /** color or key in the data that is used as the color facet for the symbols */
