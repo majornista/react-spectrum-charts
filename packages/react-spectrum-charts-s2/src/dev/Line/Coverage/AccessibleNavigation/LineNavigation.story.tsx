@@ -22,7 +22,7 @@ import { workspaceTrendsData, workspaceTrendsSixSeriesData } from '../../../../s
 import { formatTimestamp } from '../../../../storyShared/storyUtils.js';
 
 export default {
-  title: 'React Spectrum Charts 2/Accessible Navigation/Line Navigation',
+  title: 'React Spectrum Charts 2/Line/Coverage/Accessible Navigation',
 };
 
 const dialogContent = (datum: Datum): ReactElement => (
