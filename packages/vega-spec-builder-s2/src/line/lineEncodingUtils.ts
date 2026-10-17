@@ -46,7 +46,7 @@ export const getLineYEncoding = (lineMarkOptions: LineMarkOptions, metric: strin
   return [{ scale: metricAxis || 'yLinear', field: metric }];
 };
 
-export const getLineDeemphasisOpacitySignal = (name: string): ProductionRule<NumericValueRef> => {
+export const getLineDeemphasisOpacitySignal = (name: string): NumericValueRef => {
   const ramp = getDeemphasisRamp(getHoverFractionSignal(name));
   return {
     signal: `${FADE_FACTOR} + (1 - ${FADE_FACTOR}) * ${ramp}`,

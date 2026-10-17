@@ -195,6 +195,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
     | {
         dimension?: string;
         metric?: string;
+        metricAxis?: string;
         color?: unknown;
         colorOverride?: unknown;
         order?: string;
@@ -205,22 +206,33 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
         trellis?: boolean;
         name?: string;
         orientation?: Orientation;
+        scaleType?: string;
       }
     | undefined;
   const navLineType = navFields?.lineType;
   const navOpacity = navFields?.opacity;
   const navType = navFields?.type;
-  // Every field dividing the bar into series (color, lineType, opacity, dual facets), mirroring the chart's series id.
+  // Field-backed facets divide both Bar and Line series; static { value } encodings do not.
   const navSeries = useMemo(
-    () => getBarSeriesFields({ color: navFields?.color, lineType: navLineType, opacity: navOpacity, type: navType }),
+    () =>
+      getBarSeriesFields({
+        color: navFields?.color,
+        lineType: navLineType,
+        opacity: navOpacity,
+        type: navType,
+      }),
     [navFields?.color, navLineType, navOpacity, navType]
   );
   const navColor = navSeries.color;
   const navColorOverride = typeof navFields?.colorOverride === 'string' ? navFields.colorOverride : undefined;
   const navTrellis = navFields?.trellis;
   const navDualMetricAxis = navFields?.dualMetricAxis;
+  // Line has no orientation prop — always defaults to vertical, so this only ever swaps arrow keys for Bar.
   const navOrientation: Orientation = navFields?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
   const markName = navFields?.name ?? (navChartType ? `${navChartType}0` : undefined);
+  // Line's dimension defaults to the time dimension unless it's been explicitly given a discrete scaleType.
+  const navScaleType = navChartType === 'line' ? navFields?.scaleType ?? 'time' : undefined;
+  const navIsTimeDimension = navChartType === 'line' ? navScaleType === 'time' : undefined;
 
   // Axis/legend titles keyed by the field they represent, so a focused bar's accessible name and
   // (for bars without a ChartInspect) its focus tooltip read as the chart's own titles rather than
@@ -319,12 +331,14 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   // navigator mid-interaction, discarding its in-progress keyboard-focus state.
   // Only for vertical bars: the bottom axis carries the categorical dimension. A horizontal bar's
   // categorical axis is the left axis, so its bottom-axis region would not be the dimension one.
+  // Line's x-axis is a continuous time/linear scale, not the categorical tick structure this region
+  // expects, so it's excluded here — not yet wired into a navigable axis region.
   const xAxis: AxisRegionOptions | undefined = useMemo(
     () =>
-      xAxisChild && navFields?.dimension && navOrientation === 'vertical'
+      xAxisChild && navFields?.dimension && navOrientation === 'vertical' && navChartType === 'bar'
         ? { field: navFields.dimension, type: 'categorical', title: (xAxisChild.props as { title?: string }).title }
         : undefined,
-    [xAxisChild, navFields?.dimension, navOrientation]
+    [xAxisChild, navFields?.dimension, navOrientation, navChartType]
   );
 
   const getView = useCallback(() => chartView.current ?? undefined, [chartView]);
@@ -385,8 +399,12 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             colorOverride={navColorOverride}
             locale={typeof locale === 'string' ? locale : undefined}
             metric={navFields?.metric}
+            metricAxis={navFields?.metricAxis}
+            dualMetricAxis={navDualMetricAxis}
             order={navFields?.order}
             orientation={navOrientation}
+            isTimeDimension={navIsTimeDimension}
+            scaleType={navScaleType}
             fieldLabels={fieldLabels}
             metricTitleBySeries={navMetricTitleBySeries}
             hasChartInspect={hasChartInspect}

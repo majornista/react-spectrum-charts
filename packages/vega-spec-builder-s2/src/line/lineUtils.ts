@@ -9,6 +9,8 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
+import { getSeriesIdTransform } from '../data/dataUtils.js';
+import { getFacetsFromOptions } from '../specUtils.js';
 import {
   BarAnnotationOptions,
   ChartActionBarOptions,
@@ -51,7 +53,13 @@ export const isDualMetricAxis = (options: { dualMetricAxis?: boolean }): boolean
   return Boolean(options.dualMetricAxis);
 };
 
+/** Gets the rendered line's field-backed series identity expression. */
+export const getLineSeriesIdExpr = (options: Pick<LineMarkOptions, 'color' | 'lineType' | 'opacity'>): string | undefined =>
+  getSeriesIdTransform(getFacetsFromOptions(options).facets)[0]?.expr;
+
 export interface LineMarkOptions {
+  /** Experimental: keyboard navigation focus signals drive hover-style highlight/fade when true. */
+  accessibleNavigation?: boolean;
   barAnnotations?: BarAnnotationOptions[];
   chartActionBars?: ChartActionBarOptions[];
   chartPopovers?: ChartPopoverOptions[];

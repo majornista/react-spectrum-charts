@@ -94,8 +94,10 @@ export const getFacetsFromScales = (scales: Scale[] = []): string[] => {
     'secondaryOpacity',
   ].reduce((acc, cur) => {
     const scale = scales.find((scale) => scale.name === cur);
-    if (scale?.domain && 'fields' in scale.domain && scale.domain.fields.length) {
-      return [...acc, scale.domain.fields[0].toString()]; // NOSONAR typescript:S6551 - S1 is in maintenance mode; no functional changes for Sonar findings
+    // A domain field can be a signal reference instead of a plain field name; only the latter is a usable facet.
+    const field = scale?.domain && 'fields' in scale.domain ? scale.domain.fields[0] : undefined;
+    if (typeof field === 'string') {
+      return [...acc, field];
     }
     return acc;
   }, [] as string[]);
@@ -172,7 +174,7 @@ export const getPathFromSymbolShape = (symbolShape: ChartSymbolShape): string =>
  * @param icon
  * @returns strokeDash array
  */
-export const getPathFromIcon = (icon: Icon | string): string => {
+export const getPathFromIcon = (icon: Icon | (string & NonNullable<unknown>)): string => {
   const supportedIcons: { [key in Icon]: string } = {
     date: DATE_PATH,
     sentimentNegative: SENTIMENT_NEGATIVE_PATH,
@@ -244,7 +246,7 @@ export const initializeSpec = (spec: Spec | null = {}, chartOptions: Partial<Cha
     background: backgroundColor ? getColorValue(backgroundColor, colorScheme) : undefined,
   };
 
-  return { ...baseSpec, ...(spec || {}) }; // NOSONAR typescript:S7744 - S1 is in maintenance mode; no functional changes for Sonar findings
+  return { ...baseSpec, ...spec };
 };
 
 /**

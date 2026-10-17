@@ -30,6 +30,9 @@ const config: StorybookConfig = {
     config.resolve.alias = {
       ...config.resolve.alias,
       '@spectrum-charts/core-s2': fileURLToPath(new URL('../packages/core-s2/src', import.meta.url)),
+      '@spectrum-charts/vega-spec-builder-s2$': fileURLToPath(
+        new URL('../packages/vega-spec-builder-s2/index.ts', import.meta.url)
+      ),
     };
     return config;
   },
@@ -42,4 +45,3 @@ const config: StorybookConfig = {
 };
 
 export default config;
-

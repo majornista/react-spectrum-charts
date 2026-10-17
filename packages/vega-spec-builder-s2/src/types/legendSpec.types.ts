@@ -86,6 +86,7 @@ type LegendOptionsWithDefaults =
   | 'name';
 
 export interface LegendSpecOptions extends PartiallyRequired<LegendOptions, LegendOptionsWithDefaults> {
+  accessibleNavigation?: boolean;
   color?: FacetRef<string>;
   colorScheme: ColorScheme;
   hiddenSeries: string[];

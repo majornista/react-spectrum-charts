@@ -6,6 +6,8 @@ sidebar_position: 2
 
 The `Line` component in the S2 package supports all the props from the [base Line component](/docs/api/visualizations/Line) plus several S2-exclusive features: gradients, interpolation, inline direct labels, and Spectrum 2 styled point display.
 
+See [Keyboard Navigation](/docs/spectrum2/keyboard-navigation) for the `accessibleNavigation` chart prop, currently supported for `Bar` and `Line`.
+
 ```jsx
 import { Chart, Axis, Line, Legend } from '@spectrum-charts/react-spectrum-charts-s2';
 ```
