@@ -69,7 +69,7 @@ import {
   getSecondaryHighlightPoint,
   getSelectionPoint,
 } from './linePointUtils.js';
-import { LineMarkOptions } from './lineUtils.js';
+import { LineMarkOptions, getLineSeriesIdExpr } from './lineUtils.js';
 
 const GRADIENT_BASE_OPACITY = 0.2;
 const FORECAST_GRADIENT_RATIO = 0.4;
@@ -250,7 +250,8 @@ export const getLineMark = (lineMarkOptions: LineMarkOptions, dataSource: string
 };
 
 export const getLineOpacity = (lineMarkOptions: LineMarkOptions): ProductionRule<NumericValueRef> => {
-  const { accessibleNavigation, color, displayOnHover, isHoverAnimate, name } = lineMarkOptions;
+  const { accessibleNavigation, displayOnHover, isHoverAnimate, name } = lineMarkOptions;
+  const seriesId = getLineSeriesIdExpr(lineMarkOptions);
   // displayOnHover overlay marks manage their own visibility via getHighlightedSeriesOpacityRules
   if (displayOnHover) return [DEFAULT_OPACITY_RULE];
 
@@ -259,8 +260,8 @@ export const getLineOpacity = (lineMarkOptions: LineMarkOptions): ProductionRule
     // reacts to keyboard-driven focus changes. Give focus an immediate, unanimated value that wins
     // while keyboard is the most recently used modality; mouse-driven hover falls through to the
     // existing animated ramp once a mouseover flips interactionModality back to 'pointer'.
-    if (accessibleNavigation && typeof color === 'string') {
-      const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${color}`, 'prefix');
+    if (accessibleNavigation && seriesId) {
+      const focusMatchExpr = getFocusedGroupOrItemMatchExpr(seriesId, 'prefix');
       return [
         {
           test: `${INTERACTION_MODALITY} === 'keyboard' && (isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM}))`,
@@ -277,15 +278,15 @@ export const getLineOpacity = (lineMarkOptions: LineMarkOptions): ProductionRule
   return getLineOpacityRules(lineMarkOptions);
 };
 
-export const getLineOpacityRules = ({
-  accessibleNavigation,
-  color,
-  comboSiblingNames,
-  interactiveMarkName,
-  popoverMarkName,
-  isHighlightedByGroup,
-  highlightedItem,
-}: LineMarkOptions): ProductionRule<NumericValueRef> => {
+export const getLineOpacityRules = (options: LineMarkOptions): ProductionRule<NumericValueRef> => {
+  const {
+    accessibleNavigation,
+    comboSiblingNames,
+    interactiveMarkName,
+    popoverMarkName,
+    isHighlightedByGroup,
+    highlightedItem,
+  } = options;
   if (!interactiveMarkName && highlightedItem === undefined) return [DEFAULT_OPACITY_RULE];
   const strokeOpacityRules: ProductionRule<NumericValueRef> = [];
 
@@ -335,8 +336,9 @@ export const getLineOpacityRules = ({
   // Falls after the hover rule (above) and before the default. The hover rule is gated out once
   // interactionModality flips to 'keyboard' (see hoveredItemTest above), so this is the fallback
   // that shows focus whenever keyboard was the most recently used modality.
-  if (accessibleNavigation && typeof color === 'string') {
-    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${color}`, 'prefix');
+  const seriesId = getLineSeriesIdExpr(options);
+  if (accessibleNavigation && seriesId) {
+    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(seriesId, 'prefix');
     strokeOpacityRules.push({
       test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
       signal: `(${focusMatchExpr}) ? 1 : ${FADE_FACTOR}`,

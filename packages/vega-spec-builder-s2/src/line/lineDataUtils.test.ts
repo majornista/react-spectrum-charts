@@ -30,6 +30,18 @@ import { getHoverLabelData, getLineHighlightedData, getLineHoverRules, getPrimar
 import { defaultLineOptions } from './lineTestUtils.js';
 
 describe('getLineHighlightedData()', () => {
+  test.each(['lineType', 'opacity'] as const)('matches the full field-backed %s identity', (facet) => {
+    const highlighted = getLineHighlightedData({
+      ...defaultLineOptions,
+      accessibleNavigation: true,
+      [facet]: 'period',
+    });
+    expect(highlighted.transform?.[0]).toHaveProperty(
+      'expr',
+      expect.stringContaining(`${FOCUSED_ITEM} === datum.series + " | " + datum.period + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`)
+    );
+  });
+
   test('should include select signal if hasPopover', () => {
     const expr = (
       getLineHighlightedData({ ...defaultLineOptions, chartPopovers: [{}] }).transform?.[0] as FilterTransform

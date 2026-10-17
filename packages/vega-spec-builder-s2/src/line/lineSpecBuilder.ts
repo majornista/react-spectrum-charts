@@ -229,7 +229,7 @@ export const addLine = produce<
     if (lineOptions.isHoverAnimate) spec.usermeta = addUserMetaAnimatedMark(spec.usermeta, lineName);
     // Tells the legend's own accessibleNavigation opacity rules that FOCUSED_DIMENSION is keyed by
     // color/series here (Line's dimension-group level), not by category as it is for Bar.
-    if (lineOptions.accessibleNavigation && typeof lineOptions.color === 'string') {
+    if (lineOptions.accessibleNavigation && getFacetsFromOptions(lineOptions).facets.length) {
       spec.usermeta = { ...spec.usermeta, focusedDimensionIsLegendColor: true };
     }
     spec.data = addData(spec.data ?? [], lineOptions);
@@ -447,13 +447,16 @@ export const addDualMetricAxisData = (data: Data[], options: LineSpecOptions) =>
 export const getNavIndexSignalName = (name: string): string => `${name}_navIndexByMarkId`;
 
 /** Per-row nav index keyed by MARK_ID (1-based, idKey-independent — see specUtils.ts), avoiding a Vega `window` transform that would reorder the whole table by color. */
-const getNavIndexByMarkIdSignal = ({ color, data, name }: LineSpecOptions): Signal => {
-  const perColorCounts: Record<string, number> = {};
+const getNavIndexByMarkIdSignal = (options: LineSpecOptions): Signal => {
+  const { data, name } = options;
+  const { facets } = getFacetsFromOptions(options);
+  const perSeriesCounts = new Map<string, number>();
   const navIndexByMarkId: Record<number, number> = {};
   (data ?? []).forEach((row, i) => {
-    const key = typeof color === 'string' ? String((row as Record<string, unknown>)[color]) : '';
-    perColorCounts[key] = (perColorCounts[key] ?? 0) + 1;
-    navIndexByMarkId[i + 1] = perColorCounts[key];
+    const key = facets.map((field) => String((row as Record<string, unknown>)[field])).join(' | ');
+    const index = (perSeriesCounts.get(key) ?? 0) + 1;
+    perSeriesCounts.set(key, index);
+    navIndexByMarkId[i + 1] = index;
   });
   return { name: getNavIndexSignalName(name), value: navIndexByMarkId };
 };
@@ -620,7 +623,7 @@ const addLineGroupMark = (
       },
     },
     // raises the focused line's whole group (halo + line) above every other line, regardless of draw order
-    ...(hasLineFocusRing ? { encode: { update: { zindex: getLineGroupZIndexEncoding(markOptions.color) } } } : {}),
+    ...(hasLineFocusRing ? { encode: { update: { zindex: getLineGroupZIndexEncoding(markOptions) } } } : {}),
     marks: [
       // two-layer focus halo for keyboard navigation, drawn behind the real line: an outer accent
       // ring, then a background-colored gap on top of it so the accent doesn't bleed into the line

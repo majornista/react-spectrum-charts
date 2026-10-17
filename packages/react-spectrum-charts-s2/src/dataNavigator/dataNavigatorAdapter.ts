@@ -44,7 +44,7 @@ import {
   findFocusedStackRow,
   getNodeFieldValues,
 } from './barHoverParity.js';
-import { withViewKeys } from './barSeries.js';
+import { getSeriesKey, withViewKeys } from './barSeries.js';
 import { toNavigationKey } from './buildBarStructure.js';
 import {
   AxisRegionOptions,
@@ -54,7 +54,7 @@ import {
 } from './buildChartStructure.js';
 import { getNodeRegion, stripRegionPrefix } from './composeRegions.js';
 import './dataNavigator.css';
-import { getFocusedItemBounds, getFocusedItemClientPosition } from './focusedItemGeometry.js';
+import { FocusedItemFields, getFocusedItemBounds, getFocusedItemClientPosition } from './focusedItemGeometry.js';
 import {
   findFocusedBarSceneItem,
   findFocusedDimensionAreaSceneItem,
@@ -96,7 +96,7 @@ export interface AttachDataNavigatorOptions {
   dimension?: string;
   /** Series / color field (set for stacked bars), read as the series' name in labels. */
   color?: string;
-  /** Every field dividing the bar into series (color, lineType, opacity and dual-facet fields), in the chart's series-id order. */
+  /** Every field dividing the mark into series, in the chart's series-id order. */
   seriesFields?: string[];
   /** For a dodged-and-stacked bar, the fields splitting each category into side-by-side stacks. */
   dodgeFields?: string[];
@@ -110,6 +110,9 @@ export interface AttachDataNavigatorOptions {
   locale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
+  /** Line-only: the metric scale name and whether it has primary/secondary scales. */
+  metricAxis?: string;
+  dualMetricAxis?: boolean;
   /** The stack sort field. When set on a stacked bar, determines which segment is reached first, mirroring Vega's own stack sort. */
   order?: string;
   /** Chart orientation. Swaps which arrow keys move between stacks vs. within a stack. Defaults to vertical. */
@@ -168,12 +171,13 @@ interface Bounds {
 }
 
 /** The subset of a navigable mark's fields a ChartNavStrategy needs, gathered once per call instead of threaded as separate params. */
-interface StrategyContext {
+interface StrategyContext extends FocusedItemFields {
   markName: string;
   dimension: string;
   color?: string;
   metric?: string;
   scaleType?: string;
+  seriesFields?: string[];
 }
 
 /**
@@ -233,23 +237,23 @@ const barNavStrategy: ChartNavStrategy = {
 };
 
 const lineNavStrategy: ChartNavStrategy = {
-  resolveDivisionBounds: (view, container, node, { markName, color }) => {
+  resolveDivisionBounds: (view, container, node, { markName, color, seriesFields }) => {
     // A line's division represents the whole line — anchor to its own rendered path bounds, the same as a real click would (see markClickUtils.ts's getItemBounds).
     const colorValue = color ? (node.data as Record<string, unknown> | undefined)?.[color] : undefined;
-    const item = findFocusedLineSceneItem(view, markName, color, colorValue);
+    const item = findFocusedLineSceneItem(view, markName, color, colorValue, seriesFields);
     return item ? pageBoundsForItem(view, container, item) : undefined;
   },
-  resolveLeafBounds: (view, container, row, { dimension, metric, scaleType }) =>
-    metric
-      ? pageBoundsForBox(view, container, getFocusedItemBounds(view, row, { dimension, metric, scaleType }))
+  resolveLeafBounds: (view, container, row, context) =>
+    context.metric
+      ? pageBoundsForBox(view, container, getFocusedItemBounds(view, row, context))
       : undefined,
-  resolveLeafPopoverBounds: (view, row, { dimension, metric, scaleType }) =>
-    metric ? getFocusedItemBounds(view, row, { dimension, metric, scaleType }) : undefined,
+  resolveLeafPopoverBounds: (view, row, context) =>
+    context.metric ? getFocusedItemBounds(view, row, context) : undefined,
   applyFocusedLook: (view) => applyInteractionModality(view),
-  showLeafTooltip: (container, view, row, value, { dimension, metric, scaleType }) => {
+  showLeafTooltip: (container, view, row, value, context) => {
     // A Line point has no persistent rendered scene item to anchor a ring-based tooltip to — position it via scale projection instead.
     const position =
-      row && metric ? getFocusedItemClientPosition(view, container, row, { dimension, metric, scaleType }) : undefined;
+      row && context.metric ? getFocusedItemClientPosition(view, container, row, context) : undefined;
     if (position) showFocusedItemTooltipAtPosition(container, view, position, value);
   },
   canOpenDivisionPopover: false,
@@ -286,16 +290,17 @@ const resolveContentFocusBounds = (
   dimension: string,
   seriesField: string | undefined,
   metric: string | undefined,
-  scaleType: string | undefined
+  scaleType: string | undefined,
+  lineFields: Pick<StrategyContext, 'metricAxis' | 'dualMetricAxis' | 'seriesFields'>
 ): Bounds | undefined => {
   if (node.dimensionLevel === 1) return undefined;
   const strategy = chartNavStrategies[chartType];
-  const ctx: StrategyContext = { markName, dimension, color: seriesField, metric, scaleType };
+  const ctx: StrategyContext = { markName, dimension, color: seriesField, metric, scaleType, ...lineFields };
 
   if (node.dimensionLevel != null) {
     return strategy.resolveDivisionBounds(view, container, node, ctx);
   }
-  const row = findFocusedRow(view, node, dimension, seriesField);
+  const row = findFocusedRow(view, node, dimension, seriesField, lineFields.seriesFields);
   return row ? strategy.resolveLeafBounds(view, container, row, ctx) : undefined;
 };
 
@@ -383,7 +388,7 @@ const buildLeafTooltipValue = (
 };
 
 /** Chart context shared by the focus-tooltip and hover-parity-guard functions below. */
-interface FocusTooltipContext {
+interface FocusTooltipContext extends Pick<StrategyContext, 'metricAxis' | 'dualMetricAxis' | 'seriesFields'> {
   chartType: NavigableChartType;
   markName: string;
   dimension: string;
@@ -405,10 +410,11 @@ const showTooltipForFocusedNode = (
   const signals = nodeFocusSignals(node);
   if (signals.item != null) {
     // Leaf: full datum for ChartInspect, otherwise a clean axis-titled subset.
-    const row = findFocusedRow(view, node, dimension, series.field);
+    const row = findFocusedRow(view, node, dimension, series.field, context.seriesFields);
     const fields = [dimension, ...series.labelFields, metric];
     const value = row ? buildLeafTooltipValue(row, markName, hasChartInspect, fieldLabels, fields) : null;
     chartNavStrategies[chartType].showLeafTooltip(container, view, row, value, {
+      ...context,
       markName,
       dimension,
       color: series.field,
@@ -516,6 +522,8 @@ export const attachDataNavigator = ({
   colorOverride,
   locale,
   metric,
+  metricAxis,
+  dualMetricAxis,
   order,
   orientation,
   isTimeDimension,
@@ -547,7 +555,7 @@ export const attachDataNavigator = ({
       : xAxis;
 
   // Rows are keyed by the chart's own series id and dimension value, so ids match the spec's even when it parses the dimension (e.g. time).
-  const { data: navData, dimensionLabels } = withViewKeys(
+  const { data: keyedData, dimensionLabels } = withViewKeys(
     data,
     readViewData(initialView, TABLE) as SimpleData[] | undefined,
     {
@@ -555,8 +563,17 @@ export const attachDataNavigator = ({
       dimension,
     }
   );
+  const navData = chartType === 'line' && seriesFields.length > 1
+    ? keyedData.map((row) => ({ ...row, [SERIES_ID]: getSeriesKey(row, seriesFields) }))
+    : keyedData;
   const barSeriesField = navData.some((row) => SERIES_ID in row) ? SERIES_ID : color;
-  const seriesField = chartType === 'line' ? color : barSeriesField;
+  const lineSeriesField = seriesFields.length > 1 ? SERIES_ID : color;
+  const seriesField = chartType === 'line' ? lineSeriesField : barSeriesField;
+  const lineFields = {
+    metricAxis,
+    dualMetricAxis,
+    seriesFields: chartType === 'line' ? seriesFields : undefined,
+  };
   const colorLabelFields = color ? [color] : [];
   const series: SeriesLookup = {
     field: seriesField,
@@ -579,7 +596,9 @@ export const attachDataNavigator = ({
     orientation,
     isTimeDimension,
     title,
-    fieldLabels,
+    fieldLabels: chartType === 'line' && seriesFields.length > 1
+      ? { ...fieldLabels, [SERIES_ID]: seriesFields.map((field) => fieldLabels?.[field] ?? field).join(', ') }
+      : fieldLabels,
     dimensionLabels,
     metricTitleBySeries,
     xAxis: xAxisRegion,
@@ -612,6 +631,7 @@ export const attachDataNavigator = ({
       view,
       {
         chartType,
+        ...lineFields,
         markName,
         dimension,
         series,
@@ -744,10 +764,11 @@ export const attachDataNavigator = ({
   function activateLeaf(node: NodeObject) {
     const view = getView();
     if (!view || !markName || !dimension) return;
-    const row = findFocusedRow(view, node, dimension, seriesField);
+    const row = findFocusedRow(view, node, dimension, seriesField, lineFields.seriesFields);
     if (!row) return;
     const bounds = chartNavStrategies[chartType].resolveLeafPopoverBounds(view, row, {
       markName,
+      ...lineFields,
       dimension,
       color: seriesField,
       metric,
@@ -801,7 +822,8 @@ export const attachDataNavigator = ({
             dimension,
             seriesField,
             metric,
-            scaleType
+            scaleType,
+            lineFields
           )
         : undefined;
     if (contentBounds) {
@@ -888,6 +910,7 @@ export const attachDataNavigator = ({
           }
           showTooltipForFocusedNode(container, view, node, {
             chartType,
+            ...lineFields,
             markName,
             dimension,
             series,
@@ -965,8 +988,8 @@ export const attachDataNavigator = ({
       // Overlay marks (e.g. a voronoi cell) wrap the real datum one level deeper.
       const nested = (datum as { datum?: Row }).datum;
       const nodeId =
-        getNodeIdForDatum(chartType, datum as SimpleData, { dimension, seriesField }) ??
-        (nested ? getNodeIdForDatum(chartType, nested as SimpleData, { dimension, seriesField }) : undefined);
+        getNodeIdForDatum(chartType, datum as SimpleData, { dimension, seriesField, seriesFields }) ??
+        (nested ? getNodeIdForDatum(chartType, nested as SimpleData, { dimension, seriesField, seriesFields }) : undefined);
       if (!nodeId || nodeId === current) return;
       const node = structure.nodes[nodeId];
       if (!node) return;
@@ -995,7 +1018,7 @@ export const attachDataNavigator = ({
     const handleMouseOut: ViewEventHandler = (_event, item) => {
       if (item) return;
       applyInteractionModality(view);
-      view.runAsync();
+      view.runAsync().catch(logFocusError);
     };
     view.addEventListener('mouseout', handleMouseOut);
     modalityRestoreHandlers.set(view, handleMouseOut);

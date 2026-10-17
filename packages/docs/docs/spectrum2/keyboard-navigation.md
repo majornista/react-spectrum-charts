@@ -50,7 +50,7 @@ Set `accessibleNavigation` on `Chart` to let keyboard users navigate chart conte
 | `Escape` | Drills back out one layer; at the top level, exits the navigation area |
 | `Arrow Right` / `Arrow Down` | Moves to the next sibling (bar, stack, or segment) |
 | `Arrow Left` / `Arrow Up` | Moves to the previous sibling |
-| `Space` | Opens the `ChartPopover` for the focused bar, segment, or stack, if one is configured |
+| `Space` | Opens the `ChartPopover` for the focused bar, segment, stack, or Line point, if one is configured |
 
 For grouped and dual-metric-axis bars, arrows within a group follow the chart orientation, while the perpendicular arrows move between corresponding bars in adjacent groups. Forward navigation from the last bar in a group enters the first bar in the next group. Navigation does not wrap past the final group.
 
@@ -81,5 +81,9 @@ Focusing a stack — before drilling into a segment — shows the dimension-area
 ## Line charts
 
 Every `Line` — single- or multi-series — has a line-level focus stop between the chart root and its points: `Enter` on the chart root drills into a line, then `Enter` or `Arrow Right` on the focused line drills into its first point (or `Arrow Left` into its last point). `Escape` reverses this one layer at a time. `Arrow Left`/`Arrow Right` always stay within the current line, wrapping at the ends; for multi-series lines, `Arrow Up`/`Arrow Down` move between lines while at the line level, or jump to the point at the same position in the adjacent line once drilled into a point.
+
+`Enter` or `Space` on a focused point opens its `ChartPopover`, if configured, and fires the Line's `onClick` callback, if provided.
+
+When `color`, `lineType`, or `opacity` reference data fields, their combined values identify each navigable line. Static `{ value: ... }` encodings do not create separate series.
 
 Since a line's points have no persistent rendered mark of their own (the line is one continuous path), a focused point's tooltip and popover are positioned by projecting its data value through the chart's own scales, rather than by reading a rendered mark's bounds.

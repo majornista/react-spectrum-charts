@@ -29,6 +29,7 @@ const dialogContent = (datum: Datum): ReactElement => (
   <div>
     <div>{formatTimestamp(datum.datetime as number)}</div>
     <div>Event: {datum.series}</div>
+    {datum.period != null && <div>Period: {String(datum.period)}</div>}
     <div>Users: {Number(datum.value).toLocaleString()}</div>
   </div>
 );
@@ -78,6 +79,38 @@ const MultiSeriesLineNavigationStory: StoryFn = (): ReactElement => {
   );
 };
 
+const comparisonData = workspaceTrendsData.flatMap((row) => [
+  { ...row, period: 'Current' },
+  { ...row, period: 'Previous', value: Number(row.value) * 0.7 },
+]);
+
+const FacetedLineNavigationStory: StoryFn<typeof Line> = (args): ReactElement => {
+  const chartProps = useChartProps({
+    data: comparisonData,
+    minWidth: 400,
+    maxWidth: 800,
+    height: 400,
+    accessibleNavigation: true,
+  });
+  return (
+    <Chart {...chartProps}>
+      <Axis position="bottom" labelFormat="time" />
+      <Axis position="left" grid />
+      <Line dimension="datetime" metric="value" scaleType="time" color="series" {...args}>
+        <ChartInspect>{dialogContent}</ChartInspect>
+        <ChartPopover width="auto">{dialogContent}</ChartPopover>
+      </Line>
+      <Legend />
+    </Chart>
+  );
+};
+
 export const SingleLineNavigation = SingleLineNavigationStory.bind({});
 
 export const MultiSeriesLineNavigation = MultiSeriesLineNavigationStory.bind({});
+
+export const LineTypeSeriesNavigation = FacetedLineNavigationStory.bind({});
+LineTypeSeriesNavigation.args = { lineType: 'period' };
+
+export const OpacitySeriesNavigation = FacetedLineNavigationStory.bind({});
+OpacitySeriesNavigation.args = { opacity: 'period' };

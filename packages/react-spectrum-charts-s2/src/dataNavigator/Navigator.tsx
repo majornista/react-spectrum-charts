@@ -27,7 +27,7 @@ export interface NavigatorProps {
   dimension?: string;
   /** Series / color field (set for stacked bars), read as the series' name in labels. */
   color?: string;
-  /** Every field dividing the bar into series, in the chart's series-id order. Must be memoized. */
+  /** Every field dividing the mark into series, in the chart's series-id order. Must be memoized. */
   seriesFields?: string[];
   /** For a dodged-and-stacked bar, the fields splitting each category into side-by-side stacks. Must be memoized. */
   dodgeFields?: string[];
@@ -41,6 +41,9 @@ export interface NavigatorProps {
   locale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
+  /** Line-only: the metric scale name and whether it has primary/secondary scales. */
+  metricAxis?: string;
+  dualMetricAxis?: boolean;
   /** The stack sort field. When set on a stacked bar, determines which segment is reached first, mirroring Vega's own stack sort. */
   order?: string;
   /** Chart orientation. Swaps which arrow keys move between stacks vs. within a stack. Defaults to vertical. */
@@ -91,6 +94,8 @@ export const Navigator = ({
   colorOverride,
   locale,
   metric,
+  metricAxis,
+  dualMetricAxis,
   order,
   orientation,
   isTimeDimension,
@@ -130,6 +135,8 @@ export const Navigator = ({
         colorOverride,
         locale,
         metric,
+        metricAxis,
+        dualMetricAxis,
         order,
         orientation,
         isTimeDimension,
@@ -175,6 +182,8 @@ export const Navigator = ({
     colorOverride,
     locale,
     metric,
+    metricAxis,
+    dualMetricAxis,
     order,
     orientation,
     isTimeDimension,

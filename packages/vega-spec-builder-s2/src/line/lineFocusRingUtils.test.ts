@@ -83,14 +83,14 @@ describe('getLineFocusRingGap()', () => {
 
 describe('getLineGroupZIndexEncoding()', () => {
   test('raises the focused line above every other line, whether the line or one of its points is focused', () => {
-    expect(getLineGroupZIndexEncoding('series')).toEqual([
+    expect(getLineGroupZIndexEncoding(defaultLineOptions)).toEqual([
       { test: getFocusedGroupOrItemMatchExpr('datum.series', 'prefix'), value: 1 },
       { value: 0 },
     ]);
   });
 
   test('for a single-series (static color) line, raises the group when the line itself or any point is focused', () => {
-    expect(getLineGroupZIndexEncoding(singleLineOptions.color)).toEqual([
+    expect(getLineGroupZIndexEncoding(singleLineOptions)).toEqual([
       { test: `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}' || isValid(${FOCUSED_ITEM})`, value: 1 },
       { value: 0 },
     ]);
@@ -98,6 +98,43 @@ describe('getLineGroupZIndexEncoding()', () => {
 });
 
 describe('getPointFocusRing()', () => {
+  test.each(['lineType', 'opacity'] as const)('includes the field-backed %s in focus identity', (facet) => {
+    const options = { ...defaultLineOptions, [facet]: 'period' };
+    const seriesId = 'datum.series + " | " + datum.period';
+    expect(getPointFocusRing(options)).toHaveProperty('encode.update.opacity', [
+      {
+        test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === ${seriesId} + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`,
+        value: 1,
+      },
+      { value: 0 },
+    ]);
+    expect(getLineFocusRingOuter(options, 'line0_facet')).toHaveProperty('encode.update.strokeWidth', [
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ${seriesId})`, value: 12 },
+      { value: 0 },
+    ]);
+    expect(getLineFocusRingGap(options, 'line0_facet')).toHaveProperty('encode.update.strokeWidth', [
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ${seriesId})`, value: 8 },
+      { value: 0 },
+    ]);
+    expect(getLineGroupZIndexEncoding(options)).toEqual([
+      { test: getFocusedGroupOrItemMatchExpr(seriesId, 'prefix'), value: 1 },
+      { value: 0 },
+    ]);
+  });
+
+  test('uses the lineType field even when color is static', () => {
+    expect(getPointFocusRing({ ...singleLineOptions, lineType: 'period' })).toHaveProperty(
+      'encode.update.opacity',
+      [
+        {
+          test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === datum.period + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`,
+          value: 1,
+        },
+        { value: 0 },
+      ]
+    );
+  });
+
   test('sources the ring from the filtered table', () => {
     const ring = getPointFocusRing(defaultLineOptions);
     expect(ring).toHaveProperty('name', 'line0_pointFocusRing');

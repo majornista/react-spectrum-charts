@@ -28,6 +28,7 @@ import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
 import { getXProductionRule } from '../marks/markUtils.js';
 import { LineSpecOptions } from '../types/index.js';
 import { getLineYEncoding } from './lineEncodingUtils.js';
+import { LineMarkOptions, getLineSeriesIdExpr } from './lineUtils.js';
 
 export { getChartFocusRing } from '../marks/chartFocusRingUtils.js';
 
@@ -36,28 +37,22 @@ const LINE_FOCUS_RING_GAP_STROKE_WIDTH = 8;
 const POINT_FOCUS_RING_SIZE = 500;
 
 const getLineFocusRingStrokeWidth = (
-  color: LineSpecOptions['color'],
+  options: LineSpecOptions,
   width: number
 ): ProductionRule<NumericValueRef> => {
-  // A single-series line has no per-datum color value to key on — match the fixed single-line
-  // division id its structure builder uses instead (see SINGLE_LINE_NODE_ID).
-  const isFocused = typeof color === 'string' ? `${FOCUSED_DIMENSION} === datum.${color}` : `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}'`;
-  // A real mouse hover elsewhere already dims this line to the same reduced opacity as every other
-  // non-hovered line (see lineDataUtils.ts/lineMarkUtils.ts); showing the ring at full strength over
-  // a dimmed line reads as broken, so hide it too until interactionModality reverts to 'keyboard'.
+  // Static encodings use the implicit single-line division.
+  const seriesId = getLineSeriesIdExpr(options);
+  const isFocused = seriesId ? `${FOCUSED_DIMENSION} === ${seriesId}` : `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}'`;
+  // Pointer hover suppresses keyboard halos until keyboard modality is restored.
   return [
     { test: `${INTERACTION_MODALITY} === 'keyboard' && (${isFocused})`, value: width },
     { value: 0 },
   ];
 };
 
-/**
- * The outer, accent-colored layer of the two-layer halo drawn behind the real line path, visible
- * only while that line's division is focused. Wider than getLineFocusRingGap so a ring of accent
- * color remains visible around its edges once the gap layer is drawn on top of it.
- */
+/** Gets the outer accent layer of the focused line's halo. */
 export const getLineFocusRingOuter = (options: LineSpecOptions, dataSource: string): LineMark => {
-  const { color, colorScheme, dimension, interpolate, metric, name, scaleType } = options;
+  const { colorScheme, dimension, interpolate, metric, name, scaleType } = options;
   return {
     name: `${name}_focusRingOuter`,
     type: 'line',
@@ -74,19 +69,15 @@ export const getLineFocusRingOuter = (options: LineSpecOptions, dataSource: stri
       update: {
         x: getXProductionRule(scaleType, dimension),
         ...(interpolate ? { interpolate: { value: interpolate } } : {}),
-        strokeWidth: getLineFocusRingStrokeWidth(color, LINE_FOCUS_RING_OUTER_STROKE_WIDTH),
+        strokeWidth: getLineFocusRingStrokeWidth(options, LINE_FOCUS_RING_OUTER_STROKE_WIDTH),
       },
     },
   };
 };
 
-/**
- * The inner background-colored gap layer, drawn on top of getLineFocusRingOuter (and behind the
- * real line, drawn last) so the accent ring reads as a halo with a clean gap, rather than the
- * accent color bleeding directly into the line's own color.
- */
+/** Gets the background-colored gap between the line and its focus halo. */
 export const getLineFocusRingGap = (options: LineSpecOptions, dataSource: string): LineMark => {
-  const { color, dimension, interpolate, metric, name, scaleType } = options;
+  const { dimension, interpolate, metric, name, scaleType } = options;
   return {
     name: `${name}_focusRingGap`,
     type: 'line',
@@ -103,22 +94,21 @@ export const getLineFocusRingGap = (options: LineSpecOptions, dataSource: string
       update: {
         x: getXProductionRule(scaleType, dimension),
         ...(interpolate ? { interpolate: { value: interpolate } } : {}),
-        strokeWidth: getLineFocusRingStrokeWidth(color, LINE_FOCUS_RING_GAP_STROKE_WIDTH),
+        strokeWidth: getLineFocusRingStrokeWidth(options, LINE_FOCUS_RING_GAP_STROKE_WIDTH),
       },
     },
   };
 };
 
-/**
- * Raises the focused line's entire facet group (halo + line) above every other line, regardless
- * of draw order. Stays raised while a point within the line is focused, not just the line itself.
- */
-export const getLineGroupZIndexEncoding = (color: LineSpecOptions['color']): ProductionRule<NumericValueRef> => {
-  // A single-series line's leaf points are keyed by plain index (no color prefix to match), but
-  // since there's only one line, any focused item at all is by definition within it.
+/** Raises the focused line's facet group above the other lines. */
+export const getLineGroupZIndexEncoding = (
+  options: Pick<LineMarkOptions, 'color' | 'lineType' | 'opacity'>
+): ProductionRule<NumericValueRef> => {
+  // With no field-backed facets, any focused point belongs to the only line.
+  const seriesId = getLineSeriesIdExpr(options);
   const test =
-    typeof color === 'string'
-      ? getFocusedGroupOrItemMatchExpr(`datum.${color}`, 'prefix')
+    seriesId
+      ? getFocusedGroupOrItemMatchExpr(seriesId, 'prefix')
       : `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}' || isValid(${FOCUSED_ITEM})`;
   return [
     { test, value: 1 },
@@ -128,10 +118,11 @@ export const getLineGroupZIndexEncoding = (color: LineSpecOptions['color']): Pro
 
 /** A ring drawn around the focused point, on top of (and independent from) the reused hover-highlight point. */
 export const getPointFocusRing = (options: LineSpecOptions): SymbolMark => {
-  const { color, colorScheme, dimension, metric, name, scaleType } = options;
+  const { colorScheme, dimension, metric, name, scaleType } = options;
+  const seriesId = getLineSeriesIdExpr(options);
   const focusedItemId =
-    typeof color === 'string'
-      ? `datum.${color} + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`
+    seriesId
+      ? `${seriesId} + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`
       : `'' + datum.${NAVIGATION_INDEX_FIELD}`;
   return {
     name: `${name}_pointFocusRing`,

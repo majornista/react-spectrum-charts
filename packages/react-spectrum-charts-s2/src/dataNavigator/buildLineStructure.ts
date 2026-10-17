@@ -14,11 +14,13 @@ import { Edges, NavigationRules, NodeObject, Nodes, Structure } from 'data-navig
 import {
   DEFAULT_TIME_DIMENSION,
   NAVIGATION_INDEX_FIELD,
+  SERIES_ID,
   SINGLE_LINE_NODE_ID,
 } from '@spectrum-charts/core-s2/constants';
 import { SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
 
 import { segmentId } from './buildBarStructure.js';
+import { getSeriesKey } from './barSeries.js';
 import { DEFAULT_DATA_NAVIGATOR_LOCALE, getDataNavigatorIntl } from './dataNavigatorIntl.js';
 import { addOneSidedEdge, addSiblingEdge } from './graphEdgeUtils.js';
 import { applyDefaultLabels } from './nodeSemanticsUtils.js';
@@ -30,6 +32,8 @@ export interface BuildLineStructureOptions {
   dimension?: string;
   /** The series/color field. When set, the chart has multiple lines. */
   color?: string;
+  /** Field identifying the complete rendered series; defaults to color. */
+  seriesField?: string;
   /** Whether the dimension field is time-scaled; formats it as a date in accessible labels. Defaults to true. */
   isTimeDimension?: boolean;
   /** Optional chart title for the accessible description. */
@@ -61,10 +65,11 @@ const lineNavigationRules: NavigationRules = {
 };
 
 /** The data-navigator leaf id for a rendered point's datum — the inverse of the per-line indexing below. */
-export const getLineNodeId = (datum: SimpleData, color?: string): string | undefined => {
+export const getLineNodeId = (datum: SimpleData, color?: string, seriesFields: string[] = []): string | undefined => {
   const index = datum[NAVIGATION_INDEX_FIELD];
   if (index == null) return undefined;
-  return color ? segmentId(datum[color], index) : String(index);
+  const key = seriesFields.length > 1 ? getSeriesKey(datum, seriesFields) : color ? datum[color] : undefined;
+  return color ? segmentId(key, index) : String(index);
 };
 
 interface Line {
@@ -101,12 +106,13 @@ export const buildLineStructure = ({
   data,
   dimension = DEFAULT_TIME_DIMENSION,
   color,
+  seriesField = color,
   isTimeDimension = true,
   title,
   locale = DEFAULT_DATA_NAVIGATOR_LOCALE,
   fieldLabels = {},
 }: BuildLineStructureOptions): LineStructure => {
-  const lines = groupIntoLines(data, color);
+  const lines = groupIntoLines(data, seriesField);
 
   const nodes: Nodes = {};
   const edges: Edges = {};
@@ -116,16 +122,16 @@ export const buildLineStructure = ({
     id: CHART_ROOT_ID,
     edges: [],
     dimensionLevel: 1,
-    semantics: { label: buildChartDescription(data, dimension, color, title, locale, fieldLabels) },
+    semantics: { label: buildChartDescription(data, dimension, seriesField, title, locale, fieldLabels) },
   };
   lines.forEach((line) => {
     nodes[line.divisionId] = {
       id: line.divisionId,
       edges: [],
       dimensionLevel: 2,
-      derivedNode: color,
+      derivedNode: seriesField,
       data: {
-        ...(color ? { [color]: line.key } : {}),
+        ...(seriesField ? { [seriesField]: line.key } : {}),
         values: Object.fromEntries(line.pointIds.map((id) => [id, {}])),
       },
     };
@@ -249,6 +255,7 @@ export const buildNodeLabel = (
     .filter(
       ([key, value]) =>
         key !== NAVIGATION_INDEX_FIELD &&
+        key !== SERIES_ID &&
         !key.startsWith('_') &&
         value != null &&
         typeof value !== 'object' &&

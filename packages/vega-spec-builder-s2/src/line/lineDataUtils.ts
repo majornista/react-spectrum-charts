@@ -34,11 +34,13 @@ import { HoverMatchRule } from '../marks/hoverAnimationUtils.js';
 import { hasPopover, isInteractive } from '../marks/markUtils.js';
 import { LineSpecOptions } from '../types/index.js';
 import { getCascadeTransforms } from './directLabelUtils.js';
+import { getLineSeriesIdExpr } from './lineUtils.js';
 
 /** A Vega expression matching the point currently focused via keyboard navigation. */
-const getFocusedItemMatchExpr = (color?: string): string => {
-  const focusedId = color
-    ? `datum.${color} + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`
+const getFocusedItemMatchExpr = (options: LineSpecOptions): string => {
+  const seriesId = getLineSeriesIdExpr(options);
+  const focusedId = seriesId
+    ? `${seriesId} + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`
     : `'' + datum.${NAVIGATION_INDEX_FIELD}`;
   return `${FOCUSED_ITEM} === ${focusedId}`;
 };
@@ -50,7 +52,7 @@ const getFocusedItemMatchExpr = (color?: string): string => {
  * @returns
  */
 export const getLineHighlightedData = (options: LineSpecOptions): SourceData => {
-  const { accessibleNavigation, color, name: lineName, idKey } = options;
+  const { accessibleNavigation, name: lineName, idKey } = options;
 
   let expr = `isArray(${CONTROLLED_HIGHLIGHTED_ITEM}) && indexof(${CONTROLLED_HIGHLIGHTED_ITEM}, datum.${idKey}) > -1`;
 
@@ -66,9 +68,7 @@ export const getLineHighlightedData = (options: LineSpecOptions): SourceData => 
     // whole clause is an `isValid(hoveredItemSignal) && pointer-was-last ? hover match : focus
     // match`, never both.
     expr += accessibleNavigation
-      ? ` || (isValid(${hoveredItemSignal}) && ${INTERACTION_MODALITY} !== 'keyboard' ? (${hoverMatchExpr}) : (${getFocusedItemMatchExpr(
-          typeof color === 'string' ? color : undefined
-        )}))`
+      ? ` || (isValid(${hoveredItemSignal}) && ${INTERACTION_MODALITY} !== 'keyboard' ? (${hoverMatchExpr}) : (${getFocusedItemMatchExpr(options)}))`
       : ` || isValid(${hoveredItemSignal}) && (${hoverMatchExpr})`;
 
     if (hasPopover(options)) {

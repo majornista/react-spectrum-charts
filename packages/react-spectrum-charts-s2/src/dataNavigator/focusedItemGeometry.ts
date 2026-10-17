@@ -11,8 +11,9 @@
  */
 import { View } from 'vega';
 
+import { LAST_RSC_SERIES_ID, SERIES_ID } from '@spectrum-charts/core-s2/constants';
 import { toCamelCase } from '@spectrum-charts/core-s2/utils';
-import { MarkBounds, SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
+import { MarkBounds, SimpleData, getDualAxisScaleNames } from '@spectrum-charts/vega-spec-builder-s2';
 
 /** The subset of a navigable Line's fields needed to look up its x/y scales and datum fields for a keyboard-focused point's scale-projected bounds. */
 export interface FocusedItemFields {
@@ -21,6 +22,8 @@ export interface FocusedItemFields {
   scaleType?: string;
   /** Custom y scale name for dual-metric-axis charts; falls back to the default 'yLinear' scale. */
   metricAxis?: string;
+  /** Whether the last series uses the secondary metric scale. */
+  dualMetricAxis?: boolean;
 }
 
 export interface ClientPosition {
@@ -35,12 +38,17 @@ const FOCUSED_ITEM_RADIUS = 4;
 const getScaledPoint = (
   view: View,
   datum: SimpleData,
-  { dimension, metric, scaleType, metricAxis }: FocusedItemFields
+  { dimension, metric, scaleType, metricAxis, dualMetricAxis }: FocusedItemFields
 ): { x: number; y: number } | undefined => {
   if (!dimension || !metric) return undefined;
   try {
     const xScale = view.scale(toCamelCase(`x ${scaleType ?? 'linear'}`));
-    const yScale = view.scale(metricAxis || 'yLinear');
+    let yScaleName = metricAxis || 'yLinear';
+    if (dualMetricAxis) {
+      const scales = getDualAxisScaleNames(yScaleName);
+      yScaleName = datum[SERIES_ID] === view.signal(LAST_RSC_SERIES_ID) ? scales.secondaryScale : scales.primaryScale;
+    }
+    const yScale = view.scale(yScaleName);
     return { x: xScale(datum[dimension]), y: yScale(datum[metric]) };
   } catch (e) {
     console.warn('Unable to resolve scale for focused item position', e);

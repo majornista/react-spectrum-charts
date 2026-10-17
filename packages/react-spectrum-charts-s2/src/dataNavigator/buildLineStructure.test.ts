@@ -11,7 +11,7 @@
  */
 import { NodeObject, Structure } from 'data-navigator';
 
-import { NAVIGATION_INDEX_FIELD } from '@spectrum-charts/core-s2/constants';
+import { NAVIGATION_INDEX_FIELD, SERIES_ID } from '@spectrum-charts/core-s2/constants';
 
 import { segmentId } from './buildBarStructure.js';
 import { buildChartDescription, buildLineStructure, buildNodeLabel, getLineNodeId } from './buildLineStructure.js';
@@ -44,6 +44,25 @@ const multiLineData = [
 ];
 
 describe('buildLineStructure()', () => {
+  test('keeps same-color field facets in separate lines with independent point indexes', () => {
+    const rows = [
+      { datetime: 0, value: 10, series: 'A', period: 'Current' },
+      { datetime: 0, value: 20, series: 'A', period: 'Previous' },
+      { datetime: 1, value: 30, series: 'A', period: 'Current' },
+      { datetime: 1, value: 40, series: 'A', period: 'Previous' },
+    ].map((row) => ({ ...row, [SERIES_ID]: `${row.series} | ${row.period}` }));
+    const { structure } = buildLineStructure({ data: rows, color: 'series', seriesField: SERIES_ID });
+    const current = segmentId('A | Current', 1);
+    const previous = segmentId('A | Previous', 1);
+    expect(Object.values(structure.nodes).filter((node) => node.dimensionLevel === 2)).toHaveLength(2);
+    expect(move(structure, current, 'right')).toBe(segmentId('A | Current', 2));
+    expect(move(structure, current, 'down')).toBe(previous);
+    expect(move(structure, previous, 'right')).toBe(segmentId('A | Previous', 2));
+    expect(structure.nodes[current].semantics?.label).not.toContain(SERIES_ID);
+    expect(getLineNodeId({ ...rows[1], [NAVIGATION_INDEX_FIELD]: 1, [SERIES_ID]: 'unrelated-view-id' },
+      SERIES_ID, ['series', 'period'])).toBe(previous);
+  });
+
   test('keys leaf nodes by their per-line index (single line)', () => {
     const { structure } = buildLineStructure({ data, dimension: 'datetime', isTimeDimension: false });
     expect(structure.nodes['1']).toBeDefined();

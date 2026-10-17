@@ -9,7 +9,7 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { Data } from 'vega';
+import { Data, View, expressionFunction, parse } from 'vega';
 
 import {
   BACKGROUND_COLOR,
@@ -40,6 +40,8 @@ import {
 } from '@spectrum-charts/core-s2/constants';
 
 import * as signalSpecBuilder from '../signal/signalSpecBuilder.js';
+import { buildSpec } from '../chartSpecBuilder.js';
+import { getExpressionFunctions } from '../expressionFunctions/index.js';
 import { defaultSignals } from '../specTestUtils.js';
 import { initializeSpec } from '../specUtils.js';
 import { ScSpec } from '../types/index.js';
@@ -1511,10 +1513,60 @@ describe('lineSpecBuilder', () => {
         expect(navSignal?.value).toStrictEqual({ 1: 1, 2: 2, 3: 1 });
       });
 
+      test.each(['lineType', 'opacity'] as const)('indexes points separately for field-backed %s facets', (facet) => {
+        const signals = addSignals([], {
+          ...defaultLineOptions,
+          accessibleNavigation: true,
+          [facet]: 'period',
+          data: [
+            { series: 'A', period: 'Current' },
+            { series: 'A', period: 'Previous' },
+            { series: 'A', period: 'Current' },
+            { series: 'A', period: 'Previous' },
+          ],
+        });
+        expect(signals.find((signal) => signal.name === getNavIndexSignalName('line0'))).toHaveProperty(
+          'value', { 1: 1, 2: 1, 3: 2, 4: 2 }
+        );
+      });
+
       test('registers hover and interactionModality signals even when not otherwise interactive', () => {
         const signals = addSignals([], { ...defaultLineOptions, accessibleNavigation: true });
         expect(signals.some((s) => s.name === `line0_${HOVERED_ITEM}`)).toBe(true);
         expect(signals.some((s) => s.name === INTERACTION_MODALITY)).toBe(true);
+      });
+
+      test('resolves composite point focus in a running Vega view', async () => {
+        Object.entries(getExpressionFunctions()).forEach(([name, implementation]) => {
+          expressionFunction(name, implementation);
+        });
+        expressionFunction('rscContainerWidth', () => 400);
+        const rows = [
+          { datetime: 0, value: 10, series: 'A', period: 'Current', quality: 'High' },
+          { datetime: 0, value: 20, series: 'A', period: 'Previous', quality: 'High' },
+          { datetime: 1, value: 30, series: 'A', period: 'Current', quality: 'High' },
+          { datetime: 1, value: 40, series: 'A', period: 'Previous', quality: 'High' },
+        ];
+        const spec = buildSpec({
+          data: rows,
+          accessibleNavigation: true,
+          animations: false,
+          marks: [{ markType: 'line', color: 'series', lineType: 'period', opacity: 'quality' }],
+        });
+        const view = new View(parse(spec), { renderer: 'none' });
+        try {
+          view.width(400).height(300);
+          view.data(TABLE, rows);
+          await view.runAsync();
+          expect(view.data(FILTERED_TABLE).map((row) => row[NAVIGATION_INDEX_FIELD])).toEqual([1, 1, 2, 2]);
+          view.signal(INTERACTION_MODALITY, 'keyboard');
+          view.signal(FOCUSED_ITEM, 'A | Previous | High__rsc__2');
+          await view.runAsync();
+          expect(view.data('line0_highlightedData')).toHaveLength(1);
+          expect(view.data('line0_highlightedData')[0]).toMatchObject({ value: 40, period: 'Previous' });
+        } finally {
+          view.finalize();
+        }
       });
 
       test('does not add focus/interactionModality signals when accessibleNavigation is false', () => {

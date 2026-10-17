@@ -15,6 +15,7 @@ import { DIMENSION_HOVER_AREA, MARK_ID } from '@spectrum-charts/core-s2/constant
 
 import { findAxisLabelItem } from './axisLabelGeometry.js';
 import { Row } from './barHoverParity.js';
+import { getSeriesKey } from './barSeries.js';
 
 interface Bounds {
   x1: number;
@@ -83,14 +84,19 @@ export const findFocusedDimensionAreaSceneItem = (
 ): SceneNode | undefined =>
   findSceneItems(view, 'rect', `${markName}_${DIMENSION_HOVER_AREA}`).find((item) => item.datum?.[dimension] === dimensionValue);
 
-/** Finds a Line's own rendered path (not its focus ring) for a whole-line focus, matched by color value (or the first item when there's no color field). */
+/** Finds a Line's rendered path by its field-backed series identity. */
 export const findFocusedLineSceneItem = (
   view: View,
   markName: string,
   color: string | undefined,
-  colorValue: unknown
+  colorValue: unknown,
+  seriesFields?: string[]
 ): SceneNode | undefined =>
-  findSceneItems(view, 'line', markName).find((item) => color === undefined || item.datum?.[color] === colorValue);
+  findSceneItems(view, 'line', markName).find((item) =>
+    seriesFields?.length
+      ? item.datum && getSeriesKey(item.datum, seriesFields) === colorValue
+      : color === undefined || item.datum?.[color] === colorValue
+  );
 
 /** Bounds are group-relative; walk up the mark's owning groups to make them view-relative. */
 const absoluteBounds = (item: SceneNode): Bounds | undefined => {

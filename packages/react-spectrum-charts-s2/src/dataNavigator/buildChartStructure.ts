@@ -96,9 +96,10 @@ export const getNodeIdForDatum = (
     dimension = DEFAULT_CATEGORICAL_DIMENSION,
     color,
     seriesField = color,
-  }: { dimension?: string; color?: string; seriesField?: string }
+    seriesFields,
+  }: { dimension?: string; color?: string; seriesField?: string; seriesFields?: string[] }
 ): string | undefined => {
-  if (chartType === 'line') return getLineNodeId(datum, seriesField);
+  if (chartType === 'line') return getLineNodeId(datum, seriesField, seriesFields);
   if (chartType !== 'bar') return undefined;
   const dimensionKey = toDimensionKey(datum[dimension]);
   if (dimensionKey === undefined) return undefined;

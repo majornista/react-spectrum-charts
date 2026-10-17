@@ -195,6 +195,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
     | {
         dimension?: string;
         metric?: string;
+        metricAxis?: string;
         color?: unknown;
         colorOverride?: unknown;
         order?: string;
@@ -211,16 +212,16 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   const navLineType = navFields?.lineType;
   const navOpacity = navFields?.opacity;
   const navType = navFields?.type;
-  // Every field dividing the bar into series (color, lineType, opacity, dual facets), mirroring the chart's series id.
+  // Field-backed facets divide both Bar and Line series; static { value } encodings do not.
   const navSeries = useMemo(
     () =>
       getBarSeriesFields({
         color: navFields?.color,
-        lineType: navChartType === 'bar' ? navLineType : undefined,
-        opacity: navChartType === 'bar' ? navOpacity : undefined,
+        lineType: navLineType,
+        opacity: navOpacity,
         type: navType,
       }),
-    [navFields?.color, navLineType, navOpacity, navType, navChartType]
+    [navFields?.color, navLineType, navOpacity, navType]
   );
   const navColor = navSeries.color;
   const navColorOverride = typeof navFields?.colorOverride === 'string' ? navFields.colorOverride : undefined;
@@ -398,6 +399,8 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             colorOverride={navColorOverride}
             locale={typeof locale === 'string' ? locale : undefined}
             metric={navFields?.metric}
+            metricAxis={navFields?.metricAxis}
+            dualMetricAxis={navDualMetricAxis}
             order={navFields?.order}
             orientation={navOrientation}
             isTimeDimension={navIsTimeDimension}
