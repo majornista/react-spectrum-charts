@@ -44,7 +44,7 @@ describe('getLineFocusRingOuter()', () => {
     expect(ring.from).toEqual({ data: 'line0_facet' });
     expect(ring.interactive).toBe(false);
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === toString(datum.series))`, value: 12 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ('' + (datum.series)))`, value: 12 },
       { value: 0 },
     ]);
   });
@@ -67,7 +67,7 @@ describe('getLineFocusRingGap()', () => {
     expect(ring.from).toEqual({ data: 'line0_facet' });
     expect(ring.encode?.enter?.stroke).toEqual({ signal: BACKGROUND_COLOR });
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === toString(datum.series))`, value: 8 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ('' + (datum.series)))`, value: 8 },
       { value: 0 },
     ]);
   });
@@ -84,7 +84,7 @@ describe('getLineFocusRingGap()', () => {
 describe('getLineGroupZIndexEncoding()', () => {
   test('raises the focused line above every other line, whether the line or one of its points is focused', () => {
     expect(getLineGroupZIndexEncoding(defaultLineOptions)).toEqual([
-      { test: getFocusedGroupOrItemMatchExpr('toString(datum.series)', 'prefix'), value: 1 },
+      { test: getFocusedGroupOrItemMatchExpr("('' + (datum.series))", 'prefix'), value: 1 },
       { value: 0 },
     ]);
   });
@@ -127,7 +127,7 @@ describe('getPointFocusRing()', () => {
       'encode.update.opacity',
       [
         {
-          test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === toString(datum.period) + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`,
+          test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === ('' + (datum.period)) + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`,
           value: 1,
         },
         { value: 0 },
@@ -146,7 +146,7 @@ describe('getPointFocusRing()', () => {
     const ring = getPointFocusRing(defaultLineOptions);
     expect(ring.encode?.update?.opacity).toEqual([
       {
-        test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === toString(datum.series) + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`,
+        test: `${INTERACTION_MODALITY} === 'keyboard' && ${FOCUSED_ITEM} === ('' + (datum.series)) + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`,
         value: 1,
       },
       { value: 0 },

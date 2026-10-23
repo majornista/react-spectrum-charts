@@ -69,7 +69,7 @@ describe('getLineHighlightedData()', () => {
       getLineHighlightedData({ ...defaultLineOptions, accessibleNavigation: true }).transform?.[0] as FilterTransform
     ).expr;
     expect(expr).toContain(INTERACTION_MODALITY);
-    expect(expr).toContain(`${FOCUSED_ITEM} === toString(datum.series) + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`);
+    expect(expr).toContain(`${FOCUSED_ITEM} === ('' + (datum.series)) + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`);
   });
 
   test('with accessibleNavigation and a static color, keys the focus match on the index alone', () => {

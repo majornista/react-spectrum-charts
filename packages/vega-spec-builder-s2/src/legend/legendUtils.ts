@@ -201,7 +201,7 @@ export const getLegendOpacity = (options: LegendSpecOptions, userMeta: UserMeta)
   // INTERACTION_MODALITY is only ever registered by a Line with accessibleNavigation — animatedMarks
   // alone isn't a safe gate, since a hover-animated Bar also populates it without registering the
   // signal, which would otherwise crash the whole spec ("Unrecognized signal name") at Vega runtime.
-  if (options.accessibleNavigation && userMeta.focusedDimensionIsLegendColor && userMeta.animatedMarks?.length) {
+  if (options.accessibleNavigation && userMeta.hasFocusSignals && userMeta.focusedDimensionIsLegendColor && userMeta.animatedMarks?.length) {
     rules.push({
       test: `${INTERACTION_MODALITY} === 'keyboard' && (${getAccessibleNavLegendFocusTest(userMeta)})`,
       signal: `(${getAccessibleNavLegendMatchExpr(options.name, userMeta)}) ? 1 : ${FADE_FACTOR}`,
@@ -290,7 +290,7 @@ export const getOpacityEncoding = (
     });
   }
   // A focused line/point (Line) or bar/stack (Bar) keeps its legend entry at full opacity, matching the mark's own focus behavior.
-  if (accessibleNavigation && userMeta.interactiveMarks?.length) {
+  if (accessibleNavigation && userMeta.hasFocusSignals && userMeta.interactiveMarks?.length) {
     rules.push({
       test: getAccessibleNavLegendFocusTest(userMeta),
       signal: `(${getAccessibleNavLegendMatchExpr(legendName, userMeta)}) ? 1 : ${FADE_FACTOR}`,

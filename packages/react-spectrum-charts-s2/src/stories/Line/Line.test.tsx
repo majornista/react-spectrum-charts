@@ -26,7 +26,12 @@ describe('LinePointAnnotation', () => {
 });
 
 describe('Line', () => {
-  test.each([undefined, 'linear'] as const)('navigates and activates default fields with scaleType=%s and duplicate x values', async (scaleType) => {
+  test.each([
+    { scaleType: undefined, name: undefined, markName: 'line0' },
+    { scaleType: 'linear', name: undefined, markName: 'line0' },
+    { scaleType: 'linear', name: 'Sales Trend', markName: 'salesTrend' },
+    { scaleType: 'linear', name: '', markName: 'line0' },
+  ] as const)('navigates and activates default fields with scaleType=$scaleType, name=$name and duplicate x values', async ({ scaleType, name, markName }) => {
     const onClick = jest.fn();
     const data = [
       { datetime: 0, value: 10 },
@@ -37,7 +42,7 @@ describe('Line', () => {
       <Chart data={data} accessibleNavigation animations={false} width={400} height={300}>
         <Axis position="bottom" title="Time" />
         <Axis position="left" title="Amount" />
-        <Line scaleType={scaleType} onClick={onClick} />
+        <Line name={name} scaleType={scaleType} onClick={onClick} />
       </Chart>
     );
     const svg = await findChart();
@@ -49,7 +54,7 @@ describe('Line', () => {
     press('Enter');
     press('ArrowRight');
     await waitFor(async () => {
-      const rings = await findAllMarksByGroupName(svg, 'line0_pointFocusRing');
+      const rings = await findAllMarksByGroupName(svg, `${markName}_pointFocusRing`);
       expect(rings.filter((ring) => ring.getAttribute('opacity') === '1')).toHaveLength(1);
     });
     expect(document.activeElement?.querySelector('.dn-node-text')?.getAttribute('aria-label')).toContain('Amount: 20');
@@ -57,14 +62,15 @@ describe('Line', () => {
     expect(onClick).toHaveBeenLastCalledWith(expect.objectContaining({ datetime: 0, value: 20 }));
   });
 
-  test('renders a whole-line halo for numeric series identities', async () => {
+  test.each([7, '', null, undefined])('renders line and point focus rings for series=%s', async (series) => {
+    const onClick = jest.fn();
     render(
       <Chart data={[
-        { datetime: 0, value: 10, series: 7 },
-        { datetime: 1000, value: 20, series: 7 },
+        { datetime: 0, value: 10, series },
+        { datetime: 1000, value: 20, series },
         { datetime: 0, value: 30, series: 8 },
       ]} accessibleNavigation animations={false} width={400} height={300}>
-        <Line color="series" />
+        <Line color="series" onClick={onClick} />
         <Legend keys={['series']} />
       </Chart>
     );
@@ -77,6 +83,13 @@ describe('Line', () => {
       const rings = await findAllMarksByGroupName(svg, 'line0_focusRingOuter');
       expect(rings.some((ring) => Number(ring.getAttribute('stroke-width')) > 0)).toBe(true);
     });
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Enter', code: 'Enter' });
+    await waitFor(async () => {
+      const rings = await findAllMarksByGroupName(svg, 'line0_pointFocusRing');
+      expect(rings.filter((ring) => ring.getAttribute('opacity') === '1')).toHaveLength(1);
+    });
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Enter', code: 'Enter' });
+    expect(onClick).toHaveBeenLastCalledWith(expect.objectContaining({ datetime: 0, value: 10 }));
   });
 
   // Line is not a real React component. This is test just provides test coverage for sonarqube

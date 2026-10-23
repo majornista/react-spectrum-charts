@@ -34,6 +34,7 @@ import {
   FOCUSED_ITEM,
   FOCUSED_REGION,
 } from '@spectrum-charts/core-s2/constants';
+import { toCamelCase } from '@spectrum-charts/core-s2/utils';
 import { ChartHandle, Datum, Orientation, SimpleData, SymbolSize, getChartConfig } from '@spectrum-charts/vega-spec-builder-s2';
 
 import './Chart.css';
@@ -230,7 +231,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   const navDualMetricAxis = navFields?.dualMetricAxis;
   // Line has no orientation prop — always defaults to vertical, so this only ever swaps arrow keys for Bar.
   const navOrientation: Orientation = navFields?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
-  const markName = navFields?.name ?? (navChartType ? `${navChartType}0` : undefined);
+  const markName = navChartType ? toCamelCase(navFields?.name || `${navChartType}0`) : undefined;
   const navScaleType = navChartType === 'line' ? navFields?.scaleType ?? 'time' : undefined;
   const navIsTimeDimension = navChartType === 'line' ? navScaleType === 'time' : undefined;
   const navDimension = navFields?.dimension ?? (navChartType === 'line' ? DEFAULT_TIME_DIMENSION : DEFAULT_CATEGORICAL_DIMENSION);

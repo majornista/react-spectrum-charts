@@ -51,10 +51,10 @@ const FacetedNavigationStory: StoryFn<typeof Line> = (args): ReactElement => {
 };
 
 const FacetedNavigation = bindWithProps(FacetedNavigationStory);
-FacetedNavigation.args = { color: 'series', lineType: 'period' };
+FacetedNavigation.args = { name: 'Sales Trend', color: 'series', lineType: 'period' };
 FacetedNavigation.parameters = {
   regression: {
-    description: 'Default Line fields, numeric facets, duplicate x values, and multiple marks retain consistent keyboard focus and legend emphasis.',
+    description: 'Custom Line names, default fields, numeric facets, duplicate x values, and multiple marks retain consistent keyboard focus and legend emphasis.',
     pr: 4,
   },
 };

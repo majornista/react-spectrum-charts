@@ -303,7 +303,7 @@ describe('getLegendOpacity()', () => {
 
   test('prepends a keyboard-focus rule ahead of the hover-animation ramp when accessibleNavigation is set', () => {
     const options = { ...defaultLegendOptions, accessibleNavigation: true };
-    const result = getLegendOpacity(options, { animatedMarks: ['line0'], focusedDimensionIsLegendColor: true });
+    const result = getLegendOpacity(options, { animatedMarks: ['line0'], focusedDimensionIsLegendColor: true, hasFocusSignals: true });
     expect(Array.isArray(result) && result[0]).toStrictEqual({
       test: `${INTERACTION_MODALITY} === 'keyboard' && (isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM}))`,
       signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', 'prefix')}) ? 1 : ${FADE_FACTOR}`,
@@ -336,6 +336,7 @@ describe('getOpacityEncoding()', () => {
       animatedMarks: animated ? ['line0'] : undefined,
       focusedDimensionIsLegendColor: true,
       navigationLineFacets: ['series', 'period'],
+      hasFocusSignals: true,
     };
     const result = getLegendOpacity(options, userMeta);
     expect(result).toEqual(expect.arrayContaining([
@@ -367,7 +368,7 @@ describe('getOpacityEncoding()', () => {
 
   test('adds a focus rule using the suffix convention (Bar) when accessibleNavigation is set without focusedDimensionIsLegendColor', () => {
     const options = { ...defaultLegendOptions, accessibleNavigation: true };
-    const result = getOpacityEncoding(options, { interactiveMarks: [{ name: 'bar0' }] });
+    const result = getOpacityEncoding(options, { interactiveMarks: [{ name: 'bar0' }], hasFocusSignals: true });
     expect(Array.isArray(result) && result[1]).toStrictEqual({
       test: `isValid(${FOCUSED_ITEM})`,
       signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', 'suffix')}) ? 1 : ${FADE_FACTOR}`,
@@ -379,6 +380,7 @@ describe('getOpacityEncoding()', () => {
     const result = getOpacityEncoding(options, {
       interactiveMarks: [{ name: 'line0' }],
       focusedDimensionIsLegendColor: true,
+      hasFocusSignals: true,
     });
     expect(Array.isArray(result) && result[1]).toStrictEqual({
       test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
@@ -389,6 +391,18 @@ describe('getOpacityEncoding()', () => {
   test('does not add a focus rule when accessibleNavigation is unset', () => {
     const result = getOpacityEncoding(defaultLegendOptions, { interactiveMarks: [{ name: 'line0' }] });
     expect(Array.isArray(result) && result).toHaveLength(2);
+  });
+
+  test.each(['scatter0', 'area0'])('does not reference focus signals for %s when they are not registered', (name) => {
+    const result = getOpacityEncoding(
+      { ...defaultLegendOptions, accessibleNavigation: true },
+      { interactiveMarks: [{ name }], hasFocusSignals: false }
+    );
+    expect(JSON.stringify(result)).not.toContain(FOCUSED_ITEM);
+    expect(JSON.stringify(result)).not.toContain(FOCUSED_DIMENSION);
+    expect(result).toEqual(expect.arrayContaining([
+      expect.objectContaining({ test: `isValid(${name}_${HOVERED_ITEM})` }),
+    ]));
   });
 
   test('does not add a focus rule when there are no interactive marks, even with accessibleNavigation set', () => {

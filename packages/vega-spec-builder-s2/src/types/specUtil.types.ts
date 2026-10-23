@@ -58,6 +58,7 @@ export type UserMeta = {
   patches?: Partial<Config>[];
   /** Whether Line navigation registers series-level focus and interaction modality signals. */
   focusedDimensionIsLegendColor?: boolean;
+  hasFocusSignals?: boolean;
   navigationLineFacets?: string[];
 };
 

@@ -57,7 +57,7 @@ export const isDualMetricAxis = (options: { dualMetricAxis?: boolean }): boolean
 export const getLineSeriesIdExpr = (options: Pick<LineMarkOptions, 'color' | 'lineType' | 'opacity'>): string | undefined => {
   const { facets } = getFacetsFromOptions(options);
   const expr = getSeriesIdTransform(facets)[0]?.expr;
-  return facets.length === 1 ? `toString(${expr})` : expr;
+  return facets.length === 1 ? `('' + (${expr}))` : expr;
 };
 
 export interface LineMarkOptions {
