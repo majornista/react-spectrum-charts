@@ -27,13 +27,15 @@ import {
   COMPONENT_NAME,
   DEFAULT_CATEGORICAL_DIMENSION,
   DEFAULT_METRIC,
+  DEFAULT_TIME_DIMENSION,
   DEFAULT_SYMBOL_SHAPES,
   DEFAULT_SYMBOL_SIZES,
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
   FOCUSED_REGION,
 } from '@spectrum-charts/core-s2/constants';
-import { ChartHandle, Datum, Orientation, SimpleData, SymbolSize, getChartConfig } from '@spectrum-charts/vega-spec-builder-s2';
+import { toCamelCase } from '@spectrum-charts/core-s2/utils';
+import { ChartHandle, Datum, Orientation, SimpleData, SymbolSize, getChartConfig, getEffectiveMetricField } from '@spectrum-charts/vega-spec-builder-s2';
 
 import './Chart.css';
 import { VegaChart } from './VegaChart.js';
@@ -55,7 +57,9 @@ import useMarkOnClickDetails from './hooks/useMarkOnClickDetails.js';
 import usePopovers, { PopoverDetail } from './hooks/usePopovers.js';
 import useSpec from './hooks/useSpec.js';
 import useSpecProps from './hooks/useSpecProps.js';
-import { ChartChildElement, RscChartProps } from './types/index.js';
+import { childrenToOptions } from './rscToSbAdapter/childrenAdapter.js';
+import { getLineOptions } from './rscToSbAdapter/lineAdapter.js';
+import { ChartChildElement, LineProps, RscChartProps } from './types/index.js';
 import { clearHoverSignals, sanitizeMarkChildren, sanitizeRscChartChildren, setSelectedSignals, shouldClearHoverSignalsOnClose } from './utils/index.js';
 
 /** The `title` prop of the Axis child at the given `position`, if one exists. */
@@ -195,6 +199,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
     | {
         dimension?: string;
         metric?: string;
+        metricAxis?: string;
         color?: unknown;
         colorOverride?: unknown;
         order?: string;
@@ -205,22 +210,39 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
         trellis?: boolean;
         name?: string;
         orientation?: Orientation;
+        scaleType?: string;
       }
     | undefined;
   const navLineType = navFields?.lineType;
   const navOpacity = navFields?.opacity;
   const navType = navFields?.type;
-  // Every field dividing the bar into series (color, lineType, opacity, dual facets), mirroring the chart's series id.
+  // Field-backed facets divide both Bar and Line series; static { value } encodings do not.
   const navSeries = useMemo(
-    () => getBarSeriesFields({ color: navFields?.color, lineType: navLineType, opacity: navOpacity, type: navType }),
+    () =>
+      getBarSeriesFields({
+        color: navFields?.color,
+        lineType: navLineType,
+        opacity: navOpacity,
+        type: navType,
+      }),
     [navFields?.color, navLineType, navOpacity, navType]
   );
   const navColor = navSeries.color;
   const navColorOverride = typeof navFields?.colorOverride === 'string' ? navFields.colorOverride : undefined;
   const navTrellis = navFields?.trellis;
   const navDualMetricAxis = navFields?.dualMetricAxis;
+  // Line has no orientation prop — always defaults to vertical, so this only ever swaps arrow keys for Bar.
   const navOrientation: Orientation = navFields?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
-  const markName = navFields?.name ?? (navChartType ? `${navChartType}0` : undefined);
+  const markName = navChartType ? toCamelCase(navFields?.name || `${navChartType}0`) : undefined;
+  const navScaleType = navChartType === 'line' ? navFields?.scaleType ?? 'time' : undefined;
+  const navIsTimeDimension = navChartType === 'line' ? navScaleType === 'time' : undefined;
+  const navDimension = navFields?.dimension ?? (navChartType === 'line' ? DEFAULT_TIME_DIMENSION : DEFAULT_CATEGORICAL_DIMENSION);
+  const navMetric = navFields?.metric ?? DEFAULT_METRIC;
+  const navPlottingMetric = useMemo(() => {
+    if (navChartType !== 'line' || !navChild || !markName) return undefined;
+    const { alternateSegmentKey, forecasts = [] } = getLineOptions(navChild.props as LineProps, childrenToOptions);
+    return getEffectiveMetricField({ alternateSegmentKey, forecasts, metric: navMetric, name: markName });
+  }, [navChartType, navChild, markName, navMetric]);
 
   // Axis/legend titles keyed by the field they represent, so a focused bar's accessible name and
   // (for bars without a ChartInspect) its focus tooltip read as the chart's own titles rather than
@@ -236,15 +258,15 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
     const dimensionTitle = titleAt(isHorizontal ? 'left' : 'bottom');
     const metricTitle = titleAt(isHorizontal ? 'bottom' : 'left');
     const labels: Record<string, string> = {};
-    if (dimensionTitle) labels[navFields?.dimension ?? DEFAULT_CATEGORICAL_DIMENSION] = dimensionTitle;
+    if (dimensionTitle) labels[navDimension] = dimensionTitle;
     if (navColor && (legendTitle || dimensionTitle || metricTitle)) {
       labels[navColor] = legendTitle ?? navColor;
       // The other series fields (e.g. a time-comparison period) tell series apart too, so they're read under their own names.
       for (const field of navSeries.seriesFields) labels[field] ??= field;
     }
-    if (metricTitle) labels[navFields?.metric ?? DEFAULT_METRIC] = metricTitle;
+    if (metricTitle) labels[navMetric] = metricTitle;
     return labels;
-  }, [sanitizedChildren, navOrientation, navFields?.dimension, navFields?.metric, navColor, navSeries, legendTitle]);
+  }, [sanitizedChildren, navOrientation, navDimension, navMetric, navColor, navSeries, legendTitle]);
 
   const navMetricTitleBySeries = useMemo(() => {
     // Mirrors vega-spec-builder-s2's isDualMetricAxis (barUtils.ts) — keep the two in sync.
@@ -319,12 +341,14 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   // navigator mid-interaction, discarding its in-progress keyboard-focus state.
   // Only for vertical bars: the bottom axis carries the categorical dimension. A horizontal bar's
   // categorical axis is the left axis, so its bottom-axis region would not be the dimension one.
+  // Line's x-axis is a continuous time/linear scale, not the categorical tick structure this region
+  // expects, so it's excluded here — not yet wired into a navigable axis region.
   const xAxis: AxisRegionOptions | undefined = useMemo(
     () =>
-      xAxisChild && navFields?.dimension && navOrientation === 'vertical'
+      xAxisChild && navFields?.dimension && navOrientation === 'vertical' && navChartType === 'bar'
         ? { field: navFields.dimension, type: 'categorical', title: (xAxisChild.props as { title?: string }).title }
         : undefined,
-    [xAxisChild, navFields?.dimension, navOrientation]
+    [xAxisChild, navFields?.dimension, navOrientation, navChartType]
   );
 
   const getView = useCallback(() => chartView.current ?? undefined, [chartView]);
@@ -376,7 +400,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
           <Navigator
             chartType={navChartType}
             data={data as SimpleData[]}
-            dimension={navFields?.dimension}
+            dimension={navDimension}
             color={navColor}
             seriesFields={navSeries.seriesFields}
             dodgeFields={navSeries.dodgeFields}
@@ -384,9 +408,14 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             type={navFields?.type}
             colorOverride={navColorOverride}
             locale={typeof locale === 'string' ? locale : undefined}
-            metric={navFields?.metric}
+            metric={navMetric}
+            metricAxis={navFields?.metricAxis}
+            dualMetricAxis={navDualMetricAxis}
             order={navFields?.order}
             orientation={navOrientation}
+            isTimeDimension={navIsTimeDimension}
+            scaleType={navScaleType}
+            plottingMetric={navPlottingMetric}
             fieldLabels={fieldLabels}
             metricTitleBySeries={navMetricTitleBySeries}
             hasChartInspect={hasChartInspect}

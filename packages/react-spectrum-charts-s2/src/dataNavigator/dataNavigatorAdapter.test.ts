@@ -16,13 +16,18 @@ import { View } from 'vega';
 
 import {
   COMPONENT_NAME,
+  DEFAULT_TRANSFORMED_TIME_DIMENSION,
   DIMENSION_HOVER_AREA,
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
   FOCUSED_REGION,
   HOVERED_ITEM,
+  LAST_RSC_SERIES_ID,
   MARK_ID,
+  NAVIGATION_INDEX_FIELD,
   SELECTED_ITEM,
+  SERIES_ID,
+  SINGLE_LINE_NODE_ID,
 } from '@spectrum-charts/core-s2/constants';
 import { Datum, MarkBounds } from '@spectrum-charts/vega-spec-builder-s2';
 
@@ -130,10 +135,18 @@ const mockView = () => {
  * Populates the fake bottom-axis label scenegraph items getVisibleAxisLabelColumns() reads bounds
  * from directly (view-relative, no owning group offset), one per value, left-to-right.
  */
-const setAxisLabelItems = (values: string[], boundsFor: (index: number) => { x1: number; y1: number; x2: number; y2: number }): void => {
+const setAxisLabelItems = (
+  values: string[],
+  boundsFor: (index: number) => { x1: number; y1: number; x2: number; y2: number }
+): void => {
   axisLabelItems.length = 0;
   values.forEach((value, index) => {
-    axisLabelItems.push({ opacity: 1, datum: { value }, bounds: boundsFor(index), mark: { group: { orient: 'bottom' } } });
+    axisLabelItems.push({
+      opacity: 1,
+      datum: { value },
+      bounds: boundsFor(index),
+      mark: { group: { orient: 'bottom' } },
+    });
   });
 };
 
@@ -287,7 +300,12 @@ describe('attachDataNavigator()', () => {
 
   test('shows a clean axis-titled tooltip (only dimension + metric) for a bar without a ChartInspect', async () => {
     (view.data as jest.Mock).mockReturnValue(data);
-    attach({ markName: 'bar0', metric: 'downloads', fieldLabels: { browser: 'Browser', downloads: 'Downloads' }, hasChartInspect: false });
+    attach({
+      markName: 'bar0',
+      metric: 'downloads',
+      fieldLabels: { browser: 'Browser', downloads: 'Downloads' },
+      hasChartInspect: false,
+    });
     setRingBounds({ x1: 10, y1: 20, x2: 30, y2: 40 });
     entryButton().click();
     fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
@@ -298,7 +316,12 @@ describe('attachDataNavigator()', () => {
 
   test('keeps the full-datum tooltip (for ChartInspect to render) when the bar has a ChartInspect', async () => {
     (view.data as jest.Mock).mockReturnValue(data);
-    attach({ markName: 'bar0', metric: 'downloads', fieldLabels: { browser: 'Browser', downloads: 'Downloads' }, hasChartInspect: true });
+    attach({
+      markName: 'bar0',
+      metric: 'downloads',
+      fieldLabels: { browser: 'Browser', downloads: 'Downloads' },
+      hasChartInspect: true,
+    });
     setRingBounds({ x1: 10, y1: 20, x2: 30, y2: 40 });
     entryButton().click();
     fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
@@ -339,11 +362,15 @@ describe('attachDataNavigator()', () => {
     attach({ markName: 'bar0' });
     entryButton().click();
     fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
-    await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error));
+    await waitFor(() =>
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error)
+    );
 
     consoleSpy.mockClear();
     fireEvent.keyDown(focused(), { key: 'Escape', code: 'Escape' });
-    await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error));
+    await waitFor(() =>
+      expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error)
+    );
     consoleSpy.mockRestore();
   });
 
@@ -495,21 +522,27 @@ describe('attachDataNavigator()', () => {
       entryButton().click();
       fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // root -> Chrome stack
       fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // stack -> Chrome|Mac (top segment)
-      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Chrome', 'Mac'));
+      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+        segmentId('Chrome', 'Mac')
+      );
     };
 
     test('ArrowRight from a segment moves to the same series in the adjacent stack', () => {
       drillToTopSegment();
       signal.mockClear();
       fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' });
-      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Firefox', 'Mac'));
+      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+        segmentId('Firefox', 'Mac')
+      );
     });
 
     test('ArrowDown from a segment moves within the stack to the next segment', () => {
       drillToTopSegment();
       signal.mockClear();
       fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
-      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Chrome', 'Windows'));
+      expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+        segmentId('Chrome', 'Windows')
+      );
     });
 
     describe('horizontal orientation rotates the arrow-key axes', () => {
@@ -528,21 +561,27 @@ describe('attachDataNavigator()', () => {
         entryButton().click();
         fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // root -> Chrome stack
         fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // stack -> Chrome|Windows (origin segment)
-        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Chrome', 'Windows'));
+        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+          segmentId('Chrome', 'Windows')
+        );
       };
 
       test('ArrowDown moves to the same series in the adjacent stack (stacks run top-to-bottom)', () => {
         drillToOriginSegmentHorizontal();
         signal.mockClear();
         fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
-        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Firefox', 'Windows'));
+        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+          segmentId('Firefox', 'Windows')
+        );
       });
 
       test('ArrowRight moves within the stack to the next segment (segments run left-to-right)', () => {
         drillToOriginSegmentHorizontal();
         signal.mockClear();
         fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' });
-        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(segmentId('Chrome', 'Mac'));
+        expect(signal.mock.calls.find(([n, v]) => n === FOCUSED_ITEM && v !== null)?.[1]).toBe(
+          segmentId('Chrome', 'Mac')
+        );
       });
     });
 
@@ -584,7 +623,9 @@ describe('attachDataNavigator()', () => {
       const stackAggregateRows = [{ browser: 'Chrome', min_value1: 0, max_value1: 27000 }];
 
       const attachAndDrillToSegment = async () => {
-        (view.data as jest.Mock).mockImplementation((name: string) => (name === 'bar0_stacks' ? stackAggregateRows : segmentRows));
+        (view.data as jest.Mock).mockImplementation((name: string) =>
+          name === 'bar0_stacks' ? stackAggregateRows : segmentRows
+        );
         setStackRingBounds({ x1: 0, y1: 0, x2: 10, y2: 10 });
         attachDataNavigator({
           container,
@@ -816,7 +857,9 @@ describe('attachDataNavigator()', () => {
 
       simulateMouseoutClear('bar0_dimensionHoverArea_hoveredItem');
 
-      await waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error));
+      await waitFor(() =>
+        expect(consoleSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error)
+      );
       consoleSpy.mockRestore();
     });
 
@@ -1048,7 +1091,9 @@ describe('attachDataNavigator()', () => {
       ];
 
       const attachStackedWithPopoverRefs = (chartId = 'stacked-popover-chart') => {
-        (view.data as jest.Mock).mockImplementation((name: string) => (name === 'bar0_stacks' ? stackAggregateRows : []));
+        (view.data as jest.Mock).mockImplementation((name: string) =>
+          name === 'bar0_stacks' ? stackAggregateRows : []
+        );
         const selectedData: RefObject<Datum | null> = { current: null };
         const selectedDataBounds: RefObject<MarkBounds> = { current: { x1: 0, y1: 0, x2: 0, y2: 0 } };
         const selectedDataName: RefObject<string> = { current: '' };
@@ -1068,7 +1113,7 @@ describe('attachDataNavigator()', () => {
         return { selectedData, selectedDataBounds, selectedDataName };
       };
 
-      test('opens a popover with the stack\'s aggregate row, anchored to the dimension-hover-area bounds', () => {
+      test("opens a popover with the stack's aggregate row, anchored to the dimension-hover-area bounds", () => {
         setDimensionAreaItems(stackAggregateRows);
         const { selectedData, selectedDataName } = attachStackedWithPopoverRefs();
         entryButton().click();
@@ -1309,7 +1354,7 @@ describe('attachDataNavigator()', () => {
       expect(focusRing().style.display).toBe('none');
     });
 
-    test('reapplies the focused tick\'s dimension row when a real mouseout clobbers the shared hover signal', () => {
+    test("reapplies the focused tick's dimension row when a real mouseout clobbers the shared hover signal", () => {
       enterAxisRegion();
       fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // focuses the 'Chrome' tick
       signal.mockClear();
@@ -1320,4 +1365,320 @@ describe('attachDataNavigator()', () => {
     });
   });
 
+  describe('line charts', () => {
+    const lineData = [
+      { datetime: 0, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 0, value: 28, line0_rscNavIndex: 1 },
+      { datetime: 1, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 1, value: 43, line0_rscNavIndex: 2 },
+    ];
+
+    const attachLine = (overrides = {}) =>
+      attachDataNavigator({
+        container,
+        chartType: 'line',
+        data: lineData,
+        dimension: 'datetime',
+        metric: 'value',
+        scaleType: 'time',
+        markName: 'line0',
+        chartId: 'line-chart',
+        getView: () => view,
+        selectedData: { current: null },
+        selectedDataBounds: { current: { x1: 0, y1: 0, x2: 0, y2: 0 } },
+        selectedDataName: { current: '' },
+        ...overrides,
+      });
+
+    // The real rendered line0 path's own scenegraph items — unlike a bar row, every item for a given
+    // line/facet shares that line's own bounding box (see dataNavigatorAdapter.ts's resolveContentFocusBounds).
+    let lineItems: { datum: Record<string, unknown>; bounds: { x1: number; y1: number; x2: number; y2: number } }[];
+
+    beforeEach(() => {
+      // A leaf point has no rendered scene item — its position is scale-projected instead (see focusedItemGeometry.ts).
+      (view as unknown as { scale: jest.Mock }).scale = jest.fn((name: string) => {
+        if (name === 'xTime') return (v: unknown) => (v as number) * 10;
+        if (name === 'yLinear') return (v: unknown) => (v as number) * 2;
+        throw new Error(`Unrecognized scale: ${name}`);
+      });
+      (view.data as jest.Mock).mockReturnValue(lineData);
+      lineItems = [{ datum: { datetime: 0, value: 28 }, bounds: { x1: 10, y1: 20, x2: 200, y2: 90 } }];
+      (view as unknown as { scenegraph: () => unknown }).scenegraph = () => ({
+        root: { items: [{ marktype: 'line', name: 'line0', items: lineItems }] },
+      });
+    });
+
+    const enterFirstPoint = () => {
+      attachLine();
+      entryButton().click(); // chart root
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> single line (child edge)
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // line -> first point (child edge)
+    };
+
+    test('renders an entry button for a line chart', () => {
+      attachLine();
+      expect(entryButton()).toBeTruthy();
+    });
+
+    test('uses transformed time and forecast metric for overlay, tooltip and popover without replacing callback fields', async () => {
+      const rows = [{
+        datetime: 1500,
+        [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 1000,
+        value: null,
+        forecastValue: 42,
+        line0_effectiveValue: 42,
+        line0_rscNavIndex: 1,
+      }];
+      (view.data as jest.Mock).mockReturnValue(rows);
+      const selectedDataBounds = { current: { x1: 0, x2: 0, y1: 0, y2: 0 } };
+      const onNodeClick = jest.fn();
+      attachLine({ data: rows, plottingMetric: 'line0_effectiveValue', selectedDataBounds, onNodeClick });
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(focused().style.left).toBe('9996px');
+      expect(focused().style.top).toBe('80px');
+      await Promise.resolve();
+      expect(tooltipCallback).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ clientX: 10000, clientY: 84 }),
+        expect.objectContaining({ bounds: { x1: 9996, x2: 10004, y1: 80, y2: 88 } }),
+        expect.anything()
+      );
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(selectedDataBounds.current).toStrictEqual({ x1: 9996, x2: 10004, y1: 80, y2: 88 });
+      expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ datetime: 1500, value: null, forecastValue: 42 }));
+    });
+
+    test('navigates and activates same-color facet series independently of the view series id', async () => {
+      const data = [
+        { datetime: 0, value: 10, series: 'A', period: 'Current' },
+        { datetime: 0, value: 20, series: 'A', period: 'Previous' },
+        { datetime: 1, value: 30, series: 'A', period: 'Current' },
+        { datetime: 1, value: 40, series: 'A', period: 'Previous' },
+      ];
+      const rows = data.map((row, index) => ({
+        ...row,
+        [DEFAULT_TRANSFORMED_TIME_DIMENSION]: row.datetime,
+        [SERIES_ID]: `view-series-${index}`,
+        [`line0_${NAVIGATION_INDEX_FIELD}`]: Math.floor(index / 2) + 1,
+      }));
+      (view.data as jest.Mock).mockReturnValue(rows);
+      lineItems = rows.slice(0, 2).map((datum, index) => ({
+        datum, bounds: { x1: 10, y1: 20 + index * 100, x2: 200, y2: 90 + index * 100 },
+      }));
+      const onNodeClick = jest.fn();
+      attachLine({ data, color: 'series', seriesFields: ['series', 'period'], onNodeClick });
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(signal(FOCUSED_DIMENSION)).toBe('A | Current');
+      fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
+      expect(signal(FOCUSED_DIMENSION)).toBe('A | Previous');
+      expect(focused().style.top).toBe('120px');
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(signal(FOCUSED_ITEM)).toBe(segmentId('A | Previous', 1));
+      fireEvent.keyDown(focused(), { key: 'ArrowRight', code: 'ArrowRight' });
+      expect(signal(FOCUSED_ITEM)).toBe(segmentId('A | Previous', 2));
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(onNodeClick).toHaveBeenLastCalledWith(rows[3]);
+      await Promise.resolve();
+      expect(tooltipCallback).toHaveBeenLastCalledWith(
+        expect.anything(), expect.objectContaining({ clientX: 10, clientY: 80 }),
+        expect.objectContaining({ bounds: { x1: 6, x2: 14, y1: 76, y2: 84 } }),
+        expect.objectContaining({ series: 'A', period: 'Previous' })
+      );
+      fireViewEvent('mousedown', { datum: rows[2] });
+      expect(signal(FOCUSED_ITEM)).toBe(segmentId('A | Current', 2));
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(onNodeClick).toHaveBeenLastCalledWith(rows[2]);
+    });
+
+    test.each([
+      { metricAxis: 'yCustom', dualMetricAxis: false, lastSeries: 'B', expectedScale: 'yCustom', factor: 10 },
+      { metricAxis: undefined, dualMetricAxis: true, lastSeries: 'B', expectedScale: 'yLinearSecondary', factor: 20 },
+      { metricAxis: 'yCustom', dualMetricAxis: true, lastSeries: 'A', expectedScale: 'yCustomPrimary', factor: 10 },
+      { metricAxis: 'yCustom', dualMetricAxis: true, lastSeries: 'B', expectedScale: 'yCustomSecondary', factor: 20 },
+    ])('anchors overlay, tooltip and popover using $expectedScale', async (options) => {
+      const data = [
+        { datetime: 0, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 0, value: 28, series: 'A', [SERIES_ID]: 'A', line0_rscNavIndex: 1 },
+        { datetime: 0, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 0, value: 43, series: 'B', [SERIES_ID]: 'B', line0_rscNavIndex: 1 },
+      ];
+      (view.data as jest.Mock).mockReturnValue(data);
+      signal(LAST_RSC_SERIES_ID, options.lastSeries);
+      jest.spyOn(view, 'scale').mockImplementation((name) => {
+        if (name === 'xTime') return (value: number) => value * 10;
+        const base = options.metricAxis ?? 'yLinear';
+        if (name === base || name === `${base}Primary`) return (value: number) => value * 10;
+        if (name === `${base}Secondary`) return (value: number) => value * 20;
+        throw new Error(`Unexpected scale: ${name}`);
+      });
+      const selectedDataBounds = { current: { x1: 0, x2: 0, y1: 0, y2: 0 } };
+      attachLine({
+        data, color: 'series', seriesFields: ['series'], selectedDataBounds,
+        metricAxis: options.metricAxis, dualMetricAxis: options.dualMetricAxis,
+      });
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
+      const y = 43 * options.factor;
+      expect(focused().style.top).toBe(`${y - 4}px`);
+      await Promise.resolve();
+      expect(tooltipCallback).toHaveBeenLastCalledWith(
+        expect.anything(), expect.objectContaining({ clientX: 0, clientY: y }),
+        expect.objectContaining({ bounds: { x1: -4, x2: 4, y1: y - 4, y2: y + 4 } }), expect.anything()
+      );
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(selectedDataBounds.current).toStrictEqual({ x1: -4, x2: 4, y1: y - 4, y2: y + 4 });
+    });
+
+    test('focusing the first point sets the single-item focus signal', () => {
+      enterFirstPoint();
+      expect(signaledWith(FOCUSED_ITEM, '1')).toBe(true);
+    });
+
+    test('keeps single-line click ids independent of the view series id', () => {
+      const rows = lineData.map((row, index) => ({
+        ...row,
+        [SERIES_ID]: 'view-series',
+        [`line0_${NAVIGATION_INDEX_FIELD}`]: index + 1,
+      }));
+      (view.data as jest.Mock).mockReturnValue(rows);
+      attachLine();
+
+      fireViewEvent('mousedown', { datum: rows[1] });
+
+      expect(signaledWith(FOCUSED_ITEM, '2')).toBe(true);
+    });
+
+    test('keeps multi-line click and activation keyed by color when the view has synthetic series ids', () => {
+      const data = [
+        { datetime: 0, value: 28, series: 'A' },
+        { datetime: 0, value: 43, series: 'B' },
+      ];
+      const rows = data.map((row, index) => ({ ...row, [SERIES_ID]: String(index), [`line0_${NAVIGATION_INDEX_FIELD}`]: 1 }));
+      const onNodeClick = jest.fn();
+      (view.data as jest.Mock).mockReturnValue(rows);
+      attachLine({ data, color: 'series', seriesFields: ['series'], onNodeClick });
+
+      fireViewEvent('mousedown', { datum: rows[1] });
+      expect(signaledWith(FOCUSED_ITEM, segmentId('B', 1))).toBe(true);
+
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(onNodeClick).toHaveBeenCalledWith(rows[1]);
+    });
+
+    // Regression: a single-series line's division has no derivedNode/color value to report, so it
+    // previously collapsed to the same null FOCUSED_DIMENSION as nothing being focused at all —
+    // the line-level focus halo (keyed on FOCUSED_DIMENSION) never appeared. See dataNavigatorAdapter.ts's nodeFocusSignals.
+    test('focusing the single line itself (not yet a point) sets FOCUSED_DIMENSION to the single-line node id', () => {
+      attachLine();
+      entryButton().click(); // chart root
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> single line
+      expect(signaledWith(FOCUSED_DIMENSION, SINGLE_LINE_NODE_ID)).toBe(true);
+    });
+
+    // Regression: the .dn-node overlay previously fell back to the full chart container when the
+    // line itself (not a point) was focused, making the keyboard/screen-magnifier hit target
+    // indeterminately large instead of matching the real rendered line's bounds.
+    test('focusing the single line itself sizes .dn-node to the real rendered line path, not the full container', () => {
+      attachLine();
+      entryButton().click(); // chart root
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> single line
+
+      expect(focused().style).toMatchObject({ left: '10px', top: '20px', width: '190px', height: '70px' });
+    });
+
+    test('focusing a point sets interactionModality to keyboard, independent of the FOCUSED_* signals', () => {
+      enterFirstPoint();
+      expect(signaledWith('interactionModality', 'keyboard')).toBe(true);
+    });
+
+    // addInteractionModalitySignal's own `on:` trigger only ever sets 'pointer' (see signalSpecBuilder.ts),
+    // so nothing else restores 'keyboard' once a real hover has taken over the focused look.
+    test('leaving the chart entirely (no item under the pointer) restores interactionModality to keyboard', () => {
+      enterFirstPoint();
+      signal('interactionModality', 'pointer'); // a real mouseover elsewhere, via the mark's own `on:` trigger
+      fireViewEvent('mouseout', undefined);
+      expect(signal('interactionModality')).toBe('keyboard');
+    });
+
+    test('moving between marks within the chart does not restore interactionModality (item still defined)', () => {
+      enterFirstPoint();
+      signal('interactionModality', 'pointer');
+      fireViewEvent('mouseout', { datum: { datetime: 1, value: 43 } });
+      expect(signal('interactionModality')).toBe('pointer');
+    });
+
+    test('reports a rejected mouseout modality update', async () => {
+      const error = new Error('modality update failed');
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation();
+      try {
+        enterFirstPoint();
+        await Promise.resolve();
+        (view.runAsync as jest.Mock).mockRejectedValueOnce(error);
+        fireViewEvent('mouseout', undefined);
+        await Promise.resolve();
+        expect(errorSpy).toHaveBeenCalledWith('Failed to update accessible navigation focus:', error);
+      } finally {
+        errorSpy.mockRestore();
+      }
+    });
+
+    test('does not drive the real hoveredItem signal for a line (unlike Bar hover-parity)', () => {
+      enterFirstPoint();
+      expect(signal.mock.calls.some(([n]) => n === 'line0_hoveredItem')).toBe(false);
+    });
+
+    test('shows a tooltip at the scale-projected position for a focused point', async () => {
+      enterFirstPoint();
+      await Promise.resolve();
+
+      // x = datetime(0)*10 = 0, y = value(28)*2 = 56 — matches the mocked scale functions above.
+      expect(tooltipCallback).toHaveBeenCalledWith(
+        expect.objectContaining({ _el: container }),
+        expect.objectContaining({ clientX: 0, clientY: 56 }),
+        expect.objectContaining({ bounds: { x1: -4, x2: 4, y1: 52, y2: 60 } }),
+        expect.anything()
+      );
+    });
+
+    test('Enter on a focused point triggers its popover, anchored to the projected bounds', () => {
+      enterFirstPoint();
+
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+
+      expect(triggerPopover).toHaveBeenCalledWith('line-chart', 'line0', 'click');
+      expect(signaledWith(SELECTED_ITEM, undefined)).toBe(false);
+    });
+
+    test("fires onNodeClick with the focused point's row when activated", () => {
+      const onNodeClick = jest.fn();
+      attachLine({ onNodeClick });
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> line
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // line -> first point
+
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // activate the focused point
+
+      expect(onNodeClick).toHaveBeenCalledWith(expect.objectContaining({ datetime: 0, value: 28 }));
+    });
+
+    test('Space at the line-division level does not attempt to open a whole-line popover', () => {
+      attachLine();
+      entryButton().click(); // chart root
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' }); // chart root -> single line (a dimensionLevel-2 division)
+
+      fireEvent.keyDown(focused(), { key: ' ', code: 'Space' });
+
+      expect(triggerPopover).not.toHaveBeenCalled();
+    });
+
+    test('reapplies keyboard modality when a real mouseout clobbers the shared hover signal while a point is focused', () => {
+      enterFirstPoint();
+      signal.mockClear();
+
+      simulateMouseoutClear('line0_hoveredItem');
+
+      expect(signal).toHaveBeenCalledWith('interactionModality', 'keyboard');
+    });
+  });
 });

@@ -56,6 +56,10 @@ export type UserMeta = {
   chartOrientation?: Orientation;
   metricAxisCount?: number;
   patches?: Partial<Config>[];
+  /** Whether Line navigation registers series-level focus and interaction modality signals. */
+  focusedDimensionIsLegendColor?: boolean;
+  hasFocusSignals?: boolean;
+  navigationLineFacets?: string[];
 };
 
 export interface MarkBounds {

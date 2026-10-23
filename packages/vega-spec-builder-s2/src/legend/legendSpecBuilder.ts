@@ -15,6 +15,9 @@ import { Data, Legend, Mark, Scale, Signal } from 'vega';
 import {
   COLOR_SCALE,
   DEFAULT_COLOR_SCHEME,
+  FILTERED_TABLE,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
   GROUP_ID,
   HOVERED_SERIES,
   LINEAR_COLOR_SCALE,
@@ -26,9 +29,10 @@ import {
 } from '@spectrum-charts/core-s2/constants';
 import { getS2ColorValue } from '@spectrum-charts/core-s2/tokens';
 
-import { getTableData } from '../data/dataUtils.js';
+import { getSeriesIdTransform, getTableData } from '../data/dataUtils.js';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
 import { addFieldToFacetScaleDomain } from '../scale/scaleSpecBuilder.js';
-import { addHighlightSignalLegendHoverEvents, getGenericValueSignal } from '../signal/signalSpecBuilder.js';
+import { addHighlightSignalLegendHoverEvents, getGenericValueSignal, hasSignalByName } from '../signal/signalSpecBuilder.js';
 import { getLineWidthPixelsFromLineWidth, getPathFromSymbolShape, getStrokeDashFromLineType } from '../specUtils.js';
 import {
   ColorFacet,
@@ -137,13 +141,29 @@ export const addLegend = produce<
 
       // just want the unique fields
       const uniqueFacetFields = [...new Set(ordinalFacets.map((facet) => facet.field))];
+      const legendUserMeta: UserMeta = {
+        ...spec.usermeta,
+        hasFocusSignals: [FOCUSED_ITEM, FOCUSED_DIMENSION].every((signalName) => hasSignalByName(spec.signals ?? [], signalName)),
+      };
 
       spec.data = addData(spec.data ?? [], { ...legendOptions, facets: uniqueFacetFields });
+      const navigationFacets = legendUserMeta.navigationLineFacets;
+      if (legendOptions.accessibleNavigation && legendUserMeta.hasFocusSignals && navigationFacets?.length) {
+        const seriesExpr = getSeriesIdTransform(navigationFacets)[0].expr;
+        spec.data.push({
+          name: `${name}_focusedEntries`,
+          source: FILTERED_TABLE,
+          transform: [
+            { type: 'filter', expr: getFocusedGroupOrItemMatchExpr(seriesExpr, 'prefix') },
+            { type: 'formula', as: `${name}Entries`, expr: getSeriesIdTransform(uniqueFacetFields)[0].expr },
+          ],
+        });
+      }
       spec.signals = addSignals(spec.signals ?? [], legendOptions);
       spec.marks = addMarks(spec.marks ?? [], legendOptions);
 
       // add the legend
-      legends.push(getCategoricalLegend(ordinalFacets, legendOptions, spec.usermeta));
+      legends.push(getCategoricalLegend(ordinalFacets, legendOptions, legendUserMeta));
     }
 
     // continuous legends cannot be combined with any other legends

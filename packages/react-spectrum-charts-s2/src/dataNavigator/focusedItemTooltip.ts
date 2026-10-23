@@ -12,9 +12,11 @@
 import { View } from 'vega';
 
 import { DIMENSION_HOVER_AREA, MARK_ID } from '@spectrum-charts/core-s2/constants';
+import { MarkBounds } from '@spectrum-charts/vega-spec-builder-s2';
 
 import { findAxisLabelItem } from './axisLabelGeometry.js';
 import { Row } from './barHoverParity.js';
+import { getSeriesKey } from './barSeries.js';
 
 interface Bounds {
   x1: number;
@@ -82,6 +84,20 @@ export const findFocusedDimensionAreaSceneItem = (
   dimensionValue: unknown
 ): SceneNode | undefined =>
   findSceneItems(view, 'rect', `${markName}_${DIMENSION_HOVER_AREA}`).find((item) => item.datum?.[dimension] === dimensionValue);
+
+/** Finds a Line's rendered path by its field-backed series identity. */
+export const findFocusedLineSceneItem = (
+  view: View,
+  markName: string,
+  color: string | undefined,
+  colorValue: unknown,
+  seriesFields?: string[]
+): SceneNode | undefined =>
+  findSceneItems(view, 'line', markName).find((item) =>
+    seriesFields?.length
+      ? item.datum && String(getSeriesKey(item.datum, seriesFields)) === String(colorValue)
+      : color === undefined || String(item.datum?.[color]) === String(colorValue)
+  );
 
 /** Bounds are group-relative; walk up the mark's owning groups to make them view-relative. */
 const absoluteBounds = (item: SceneNode): Bounds | undefined => {
@@ -161,4 +177,27 @@ export const showFocusedItemTooltip = (container: HTMLElement, view: View, ringM
   };
 
   tooltipCallback(fakeHandler, syntheticEvent, ringItem, value);
+};
+
+/** Shows a focused point's tooltip using projected bounds for mark anchoring and a client position for cursor anchoring. */
+export const showFocusedItemTooltipAtPosition = (
+  container: HTMLElement,
+  view: View,
+  position: { clientX: number; clientY: number },
+  value: unknown,
+  bounds: MarkBounds
+): void => {
+  const tooltipCallback = getRegisteredTooltipCallback(view);
+  if (!tooltipCallback) return;
+
+  if (value == null) {
+    tooltipCallback(undefined, undefined, undefined, null);
+    return;
+  }
+
+  const [originX, originY] = view.origin();
+  const fakeHandler = { _el: container, _origin: [originX, originY] };
+  const syntheticEvent = { type: 'focus', ...position };
+  const item = { bounds, mark: {} };
+  tooltipCallback(fakeHandler, syntheticEvent, item, value);
 };

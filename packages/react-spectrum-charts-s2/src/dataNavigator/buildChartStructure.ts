@@ -16,10 +16,11 @@ import { Orientation, SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
 
 import { AxisFieldType, buildAxisStructure } from './buildAxisStructure.js';
 import { barId, buildBarStructure, segmentId, toDimensionKey } from './buildBarStructure.js';
-import { composeRegions, NamedRegion } from './composeRegions.js';
+import { buildLineStructure, getLineNodeId } from './buildLineStructure.js';
+import { NamedRegion, composeRegions } from './composeRegions.js';
 import { getBaseNavigationRules } from './navigationRules.js';
 
-export type NavigableChartType = 'bar';
+export type NavigableChartType = 'bar' | 'line';
 
 export interface AxisRegionOptions {
   /** The field this axis represents — the dimension for a categorical x-axis. */
@@ -67,6 +68,8 @@ export interface ChartStructureOptions {
   dimensionLabels?: Map<string, unknown>;
   /** Per-series metric-axis titles for dual-metric-axis bars. */
   metricTitleBySeries?: Record<string, string>;
+  /** Whether a line's dimension field is time-scaled; formats it as a date in accessible labels. */
+  isTimeDimension?: boolean;
   /** When provided, adds a sibling-navigable x-axis region alongside chart content (Left/Right moves between them). */
   xAxis?: AxisRegionOptions;
 }
@@ -78,6 +81,7 @@ export interface ChartStructure {
 
 const contentStructureBuilders: Record<NavigableChartType, (options: ChartStructureOptions) => ChartStructure> = {
   bar: buildBarStructure,
+  line: buildLineStructure,
 };
 
 /**
@@ -88,8 +92,15 @@ const contentStructureBuilders: Record<NavigableChartType, (options: ChartStruct
 export const getNodeIdForDatum = (
   chartType: NavigableChartType,
   datum: SimpleData,
-  { dimension = DEFAULT_CATEGORICAL_DIMENSION, seriesField }: { dimension?: string; seriesField?: string }
+  {
+    dimension = DEFAULT_CATEGORICAL_DIMENSION,
+    color,
+    seriesField = color,
+    seriesFields,
+    markName,
+  }: { dimension?: string; color?: string; seriesField?: string; seriesFields?: string[]; markName?: string }
 ): string | undefined => {
+  if (chartType === 'line') return getLineNodeId(datum, seriesField, seriesFields, markName);
   if (chartType !== 'bar') return undefined;
   const dimensionKey = toDimensionKey(datum[dimension]);
   if (dimensionKey === undefined) return undefined;

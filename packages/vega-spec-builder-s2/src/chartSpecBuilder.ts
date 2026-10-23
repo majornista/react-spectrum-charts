@@ -167,14 +167,21 @@ export function buildSpec({
     highlightedSeries,
     legendHighlightSignals,
   };
-  spec = [...marks].reduce((acc: ScSpec, mark) => {
+  const navigationMarkIndex = marks.findIndex(({ markType }) => markType === 'bar' || markType === 'line');
+  spec = [...marks].reduce((acc: ScSpec, mark, markIndex) => {
     switch (mark.markType) {
       case 'area':
         areaCount++;
         return addArea(acc, { ...mark, ...specOptions, index: areaCount });
       case 'bar':
         barCount++;
-        return addBar(acc, { ...mark, ...specOptions, index: barCount, data });
+        return addBar(acc, {
+          ...mark,
+          ...specOptions,
+          accessibleNavigation: accessibleNavigation && markIndex === navigationMarkIndex,
+          index: barCount,
+          data,
+        });
       case 'bullet':
         bulletCount++;
         return addBullet(acc, { ...mark, ...specOptions, index: bulletCount });
@@ -186,7 +193,13 @@ export function buildSpec({
         return addDonut(acc, { ...mark, ...specOptions, index: donutCount, data });
       case 'line':
         lineCount++;
-        return addLine(acc, { ...mark, ...specOptions, index: lineCount, data });
+        return addLine(acc, {
+          ...mark,
+          ...specOptions,
+          accessibleNavigation: accessibleNavigation && markIndex === navigationMarkIndex,
+          index: lineCount,
+          data,
+        });
       case 'scatter':
         scatterCount++;
         return addScatter(acc, { ...mark, ...specOptions, index: scatterCount });

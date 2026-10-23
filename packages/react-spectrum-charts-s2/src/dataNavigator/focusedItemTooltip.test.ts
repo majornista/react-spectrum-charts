@@ -10,14 +10,17 @@
  * governing permissions and limitations under the License.
  */
 import { View } from 'vega';
+import { Handler } from 'vega-tooltip';
 
 import { MARK_ID } from '@spectrum-charts/core-s2/constants';
 
 import {
   findFocusedBarSceneItem,
   findFocusedDimensionAreaSceneItem,
+  findFocusedLineSceneItem,
   hideFocusedItemTooltip,
   showFocusedItemTooltip,
+  showFocusedItemTooltipAtPosition,
 } from './focusedItemTooltip.js';
 
 const MARK_NAME = 'bar0';
@@ -42,6 +45,34 @@ const mockView = (ringItems: object[] = [], origin: [number, number] = [0, 0]) =
 beforeEach(() => {
   container = document.createElement('div');
   jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0 } as DOMRect);
+});
+
+describe('showFocusedItemTooltipAtPosition()', () => {
+  test.each(['right', 'bottom'] as const)('honors mark anchoring with %s placement', (placement) => {
+    const handler = new Handler({
+      id: 'line-focus-tooltip',
+      anchor: 'mark',
+      position: [placement],
+      offsetX: 6,
+      offsetY: 6,
+      disableDefaultStyle: true,
+    });
+    const view = mockView([], [5, 7]);
+    (view.tooltip as jest.Mock).mockReturnValue(handler.call);
+    jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 100 } as DOMRect);
+    try {
+      showFocusedItemTooltipAtPosition(
+        container, view, { clientX: 205, clientY: 191 }, { value: 42 },
+        { x1: 96, x2: 104, y1: 80, y2: 88 }
+      );
+      const tooltip = document.getElementById('line-focus-tooltip') as HTMLElement;
+      expect(tooltip.classList.contains('visible')).toBe(true);
+      expect(tooltip.style.left).toBe(placement === 'right' ? '215px' : '205px');
+      expect(tooltip.style.top).toBe(placement === 'right' ? '191px' : '201px');
+    } finally {
+      document.getElementById('line-focus-tooltip')?.remove();
+    }
+  });
 });
 
 describe('showFocusedItemTooltip()', () => {
@@ -157,5 +188,42 @@ describe('findFocusedDimensionAreaSceneItem()', () => {
     const view = mockDimensionAreaView([{ datum: { browser: 'Firefox' } }]);
 
     expect(findFocusedDimensionAreaSceneItem(view, MARK_NAME, 'browser', 'Chrome')).toBeUndefined();
+  });
+});
+
+describe('findFocusedLineSceneItem()', () => {
+  const LINE_NAME = 'line0';
+
+  const mockLineView = (items: { datum: Record<string, unknown> }[]) =>
+    ({
+      scenegraph: () => ({ root: { items: [{ marktype: 'line', name: LINE_NAME, items }] } }),
+    }) as unknown as View;
+
+  test('finds a rendered line item whose datum carries the given color value', () => {
+    const match = { datum: { series: 'A', value: 28 } };
+    const view = mockLineView([{ datum: { series: 'B', value: 20 } }, match]);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', 'A')).toBe(match);
+  });
+
+  test('returns undefined when no rendered item matches the given color value', () => {
+    const view = mockLineView([{ datum: { series: 'B', value: 20 } }]);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', 'A')).toBeUndefined();
+  });
+
+  test('matches numeric rendered facets to string navigation keys', () => {
+    const match = { datum: { series: 7 } };
+    const view = mockLineView([{ datum: { series: 8 } }, match]);
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', '7')).toBe(match);
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', '7', ['series'])).toBe(match);
+  });
+
+  // A single-series line has no color field to match on — there's only one line, so any of its rendered items works.
+  test('with no color field (single-series), returns the first rendered item regardless of datum', () => {
+    const items = [{ datum: { value: 28 } }, { datum: { value: 43 } }];
+    const view = mockLineView(items);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, undefined, undefined)).toBe(items[0]);
   });
 });

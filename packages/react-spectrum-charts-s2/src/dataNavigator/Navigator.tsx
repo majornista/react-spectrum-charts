@@ -27,7 +27,7 @@ export interface NavigatorProps {
   dimension?: string;
   /** Series / color field (set for stacked bars), read as the series' name in labels. */
   color?: string;
-  /** Every field dividing the bar into series, in the chart's series-id order. Must be memoized. */
+  /** Every field dividing the mark into series, in the chart's series-id order. Must be memoized. */
   seriesFields?: string[];
   /** For a dodged-and-stacked bar, the fields splitting each category into side-by-side stacks. Must be memoized. */
   dodgeFields?: string[];
@@ -41,10 +41,19 @@ export interface NavigatorProps {
   locale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
+  /** Line-only: rendered metric field used for projected bounds, separate from accessible labels. */
+  plottingMetric?: string;
+  /** Line-only: the metric scale name and whether it has primary/secondary scales. */
+  metricAxis?: string;
+  dualMetricAxis?: boolean;
   /** The stack sort field. When set on a stacked bar, determines which segment is reached first, mirroring Vega's own stack sort. */
   order?: string;
   /** Chart orientation. Swaps which arrow keys move between stacks vs. within a stack. Defaults to vertical. */
   orientation?: Orientation;
+  /** Line-only: whether the dimension field is time-scaled; formats it as a date in accessible labels. */
+  isTimeDimension?: boolean;
+  /** Line-only: the line's x-scale type, used to resolve a focused point's rendered position for popover/tooltip anchoring. */
+  scaleType?: string;
   /** Maps a data field to its axis/legend title — drives the focused leaf's accessible name and a clean focus tooltip for bars without a ChartInspect. */
   fieldLabels?: Record<string, string>;
   /** Per-series metric-axis titles for dual-metric-axis bars. */
@@ -87,8 +96,13 @@ export const Navigator = ({
   colorOverride,
   locale,
   metric,
+  plottingMetric,
+  metricAxis,
+  dualMetricAxis,
   order,
   orientation,
+  isTimeDimension,
+  scaleType,
   fieldLabels,
   metricTitleBySeries,
   hasChartInspect,
@@ -124,8 +138,13 @@ export const Navigator = ({
         colorOverride,
         locale,
         metric,
+        plottingMetric,
+        metricAxis,
+        dualMetricAxis,
         order,
         orientation,
+        isTimeDimension,
+        scaleType,
         fieldLabels,
         metricTitleBySeries,
         hasChartInspect,
@@ -167,8 +186,13 @@ export const Navigator = ({
     colorOverride,
     locale,
     metric,
+    plottingMetric,
+    metricAxis,
+    dualMetricAxis,
     order,
     orientation,
+    isTimeDimension,
+    scaleType,
     fieldLabels,
     metricTitleBySeries,
     hasChartInspect,

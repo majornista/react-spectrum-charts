@@ -12,7 +12,7 @@
 import { NodeObject } from 'data-navigator';
 import { View } from 'vega';
 
-import { DIMENSION_HOVER_AREA, FILTERED_TABLE, HOVERED_ITEM } from '@spectrum-charts/core-s2/constants';
+import { DIMENSION_HOVER_AREA, FILTERED_TABLE, HOVERED_ITEM, NAVIGATION_INDEX_FIELD } from '@spectrum-charts/core-s2/constants';
 
 export interface BarHoverParityOptions {
   /** The bar mark's own name (e.g. `bar0`) — signals are namespaced off of it, same as mouse hover. */
@@ -35,12 +35,25 @@ export const getNodeFieldValues = (node: NodeObject, dimension: string, color?: 
 };
 
 /** Finds the live post-`identifier`-transform row matching a focused node, since `node.data` predates that transform. `undefined` for a division — no single row represents a whole stack. */
-export const findFocusedRow = (view: View, node: NodeObject, dimension: string, color?: string): Row | undefined => {
+export const findFocusedRow = (
+  view: View,
+  node: NodeObject,
+  dimension: string,
+  color?: string,
+  seriesFields?: string[],
+  lineMarkName?: string
+): Row | undefined => {
   const { dimensionValue, colorValue } = getNodeFieldValues(node, dimension, color);
   if (dimensionValue == null) return undefined;
   const rows = (view.data(FILTERED_TABLE) ?? []) as Row[];
   // A division (whole stack) has no series of its own, so any row for that dimension value matches.
-  return rows.find((row) => row[dimension] === dimensionValue && (colorValue === undefined || (color && row[color] === colorValue)));
+  return rows.find((row) => row[dimension] === dimensionValue && (
+    !lineMarkName || row[`${lineMarkName}_${NAVIGATION_INDEX_FIELD}`] === node.data?.[NAVIGATION_INDEX_FIELD]
+  ) && (
+    seriesFields?.length
+      ? seriesFields.every((field) => row[field] === node.data?.[field])
+      : colorValue === undefined || (color && row[color] === colorValue)
+  ));
 };
 
 /**

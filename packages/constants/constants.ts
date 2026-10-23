@@ -184,6 +184,12 @@ export const FOCUSED_REGION = 'focusedRegion'; // chart region focused via keybo
 export const FOCUSED_DIMENSION = 'focusedDimension'; // dimension group (e.g. a whole stack) focused via keyboard navigation
 /** Separator joining fields into a unique data-navigator node id (e.g. stacked segment = dimension + series). */
 export const NAVIGATION_ID_SEPARATOR = '__rsc__';
+/** A point's 1-based position within its line, injected for keyboard-navigation focus-ring matching and click-to-focus. */
+export const NAVIGATION_INDEX_FIELD = 'rscNavIndex';
+/** Most recent input method ('pointer' | 'keyboard' | null) — lets a mark's own opacity/highlight logic defer to whichever last drove focus. */
+export const INTERACTION_MODALITY = 'interactionModality';
+/** The data-navigator division node id for a single-series (no color) Line's one implicit line — there's no per-datum color value to key the line-level focus ring on, so both the structure builder and the spec builder match against this fixed id instead. */
+export const SINGLE_LINE_NODE_ID = 'line';
 
 // scale names
 export const COLOR_SCALE = 'color';

@@ -17,3 +17,5 @@ export * from './specUtils.js';
 export * from './types/index.js';
 export * from './expressionFunctions/index.js';
 export * from './vegaEmbedUtils.js';
+export { getDualAxisScaleNames } from './scale/scaleUtils.js';
+export { getEffectiveMetricField } from './lineForecast/index.js';
