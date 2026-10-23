@@ -329,6 +329,20 @@ describe('getLegendOpacity()', () => {
 });
 
 describe('getOpacityEncoding()', () => {
+  test.each([false, true])('uses legend-specific focused entries with animations=%s', (animated) => {
+    const options = { ...defaultLegendOptions, accessibleNavigation: true, keys: ['series'] };
+    const userMeta = {
+      interactiveMarks: [{ name: 'line0' }],
+      animatedMarks: animated ? ['line0'] : undefined,
+      focusedDimensionIsLegendColor: true,
+      navigationLineFacets: ['series', 'period'],
+    };
+    const result = getLegendOpacity(options, userMeta);
+    expect(result).toEqual(expect.arrayContaining([
+      expect.objectContaining({ signal: `(indata('legend0_focusedEntries', 'legend0Entries', datum.value)) ? 1 : ${FADE_FACTOR}` }),
+    ]));
+  });
+
   // Regression guard: INTERACTION_MODALITY is only ever registered as a Vega signal by a Line mark
   // with accessibleNavigation — never by Bar. Referencing it unconditionally here previously made
   // Vega reject the whole spec ("Unrecognized signal name") for any Bar-only chart with a legend.

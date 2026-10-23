@@ -97,9 +97,10 @@ export const getNodeIdForDatum = (
     color,
     seriesField = color,
     seriesFields,
-  }: { dimension?: string; color?: string; seriesField?: string; seriesFields?: string[] }
+    markName,
+  }: { dimension?: string; color?: string; seriesField?: string; seriesFields?: string[]; markName?: string }
 ): string | undefined => {
-  if (chartType === 'line') return getLineNodeId(datum, seriesField, seriesFields);
+  if (chartType === 'line') return getLineNodeId(datum, seriesField, seriesFields, markName);
   if (chartType !== 'bar') return undefined;
   const dimensionKey = toDimensionKey(datum[dimension]);
   if (dimensionKey === undefined) return undefined;

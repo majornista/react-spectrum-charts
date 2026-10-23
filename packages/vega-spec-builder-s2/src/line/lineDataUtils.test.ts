@@ -38,7 +38,7 @@ describe('getLineHighlightedData()', () => {
     });
     expect(highlighted.transform?.[0]).toHaveProperty(
       'expr',
-      expect.stringContaining(`${FOCUSED_ITEM} === datum.series + " | " + datum.period + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`)
+      expect.stringContaining(`${FOCUSED_ITEM} === datum.series + " | " + datum.period + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`)
     );
   });
 
@@ -69,7 +69,7 @@ describe('getLineHighlightedData()', () => {
       getLineHighlightedData({ ...defaultLineOptions, accessibleNavigation: true }).transform?.[0] as FilterTransform
     ).expr;
     expect(expr).toContain(INTERACTION_MODALITY);
-    expect(expr).toContain(`${FOCUSED_ITEM} === datum.series + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`);
+    expect(expr).toContain(`${FOCUSED_ITEM} === toString(datum.series) + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`);
   });
 
   test('with accessibleNavigation and a static color, keys the focus match on the index alone', () => {
@@ -80,7 +80,7 @@ describe('getLineHighlightedData()', () => {
         color: { value: 'categorical-100' },
       }).transform?.[0] as FilterTransform
     ).expr;
-    expect(expr).toContain(`${FOCUSED_ITEM} === '' + datum.${NAVIGATION_INDEX_FIELD}`);
+    expect(expr).toContain(`${FOCUSED_ITEM} === '' + datum.line0_${NAVIGATION_INDEX_FIELD}`);
   });
 });
 
@@ -207,5 +207,17 @@ describe('getLineHoverRules()', () => {
       color: { value: 'categorical-100' },
     });
     expect(rules.some((r) => r.as === 'focusMatch')).toBe(false);
+  });
+
+  test.each(['lineType', 'opacity'] as const)('matches retained aggregate series ids with a field-backed %s and static color', (facet) => {
+    const rules = getLineHoverRules({
+      ...defaultLineOptions,
+      accessibleNavigation: true,
+      color: { value: 'categorical-100' },
+      [facet]: 'period',
+    });
+    const expr = rules.find((rule) => rule.as === 'focusMatch')?.expr;
+    expect(expr).toContain(`datum.${SERIES_ID}`);
+    expect(expr).not.toContain('datum.period');
   });
 });

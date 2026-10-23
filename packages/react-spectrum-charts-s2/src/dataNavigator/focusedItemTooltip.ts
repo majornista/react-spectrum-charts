@@ -94,8 +94,8 @@ export const findFocusedLineSceneItem = (
 ): SceneNode | undefined =>
   findSceneItems(view, 'line', markName).find((item) =>
     seriesFields?.length
-      ? item.datum && getSeriesKey(item.datum, seriesFields) === colorValue
-      : color === undefined || item.datum?.[color] === colorValue
+      ? item.datum && String(getSeriesKey(item.datum, seriesFields)) === String(colorValue)
+      : color === undefined || String(item.datum?.[color]) === String(colorValue)
   );
 
 /** Bounds are group-relative; walk up the mark's owning groups to make them view-relative. */

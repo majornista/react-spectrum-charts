@@ -1366,8 +1366,8 @@ describe('attachDataNavigator()', () => {
 
   describe('line charts', () => {
     const lineData = [
-      { datetime: 0, value: 28 },
-      { datetime: 1, value: 43 },
+      { datetime: 0, value: 28, line0_rscNavIndex: 1 },
+      { datetime: 1, value: 43, line0_rscNavIndex: 2 },
     ];
 
     const attachLine = (overrides = {}) =>
@@ -1427,7 +1427,7 @@ describe('attachDataNavigator()', () => {
       const rows = data.map((row, index) => ({
         ...row,
         [SERIES_ID]: `view-series-${index}`,
-        [NAVIGATION_INDEX_FIELD]: Math.floor(index / 2) + 1,
+        [`line0_${NAVIGATION_INDEX_FIELD}`]: Math.floor(index / 2) + 1,
       }));
       (view.data as jest.Mock).mockReturnValue(rows);
       lineItems = rows.slice(0, 2).map((datum, index) => ({
@@ -1465,8 +1465,8 @@ describe('attachDataNavigator()', () => {
       { metricAxis: 'yCustom', dualMetricAxis: true, lastSeries: 'B', expectedScale: 'yCustomSecondary', factor: 20 },
     ])('anchors overlay, tooltip and popover using $expectedScale', async (options) => {
       const data = [
-        { datetime: 0, value: 28, series: 'A', [SERIES_ID]: 'A' },
-        { datetime: 0, value: 43, series: 'B', [SERIES_ID]: 'B' },
+        { datetime: 0, value: 28, series: 'A', [SERIES_ID]: 'A', line0_rscNavIndex: 1 },
+        { datetime: 0, value: 43, series: 'B', [SERIES_ID]: 'B', line0_rscNavIndex: 1 },
       ];
       (view.data as jest.Mock).mockReturnValue(data);
       signal(LAST_RSC_SERIES_ID, options.lastSeries);
@@ -1505,7 +1505,7 @@ describe('attachDataNavigator()', () => {
       const rows = lineData.map((row, index) => ({
         ...row,
         [SERIES_ID]: 'view-series',
-        [NAVIGATION_INDEX_FIELD]: index + 1,
+        [`line0_${NAVIGATION_INDEX_FIELD}`]: index + 1,
       }));
       (view.data as jest.Mock).mockReturnValue(rows);
       attachLine();
@@ -1520,7 +1520,7 @@ describe('attachDataNavigator()', () => {
         { datetime: 0, value: 28, series: 'A' },
         { datetime: 0, value: 43, series: 'B' },
       ];
-      const rows = data.map((row, index) => ({ ...row, [SERIES_ID]: String(index), [NAVIGATION_INDEX_FIELD]: 1 }));
+      const rows = data.map((row, index) => ({ ...row, [SERIES_ID]: String(index), [`line0_${NAVIGATION_INDEX_FIELD}`]: 1 }));
       const onNodeClick = jest.fn();
       (view.data as jest.Mock).mockReturnValue(rows);
       attachLine({ data, color: 'series', seriesFields: ['series'], onNodeClick });

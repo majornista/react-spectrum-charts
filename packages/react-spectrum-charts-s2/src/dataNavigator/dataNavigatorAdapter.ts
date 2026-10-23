@@ -300,7 +300,7 @@ const resolveContentFocusBounds = (
   if (node.dimensionLevel != null) {
     return strategy.resolveDivisionBounds(view, container, node, ctx);
   }
-  const row = findFocusedRow(view, node, dimension, seriesField, lineFields.seriesFields);
+  const row = findFocusedRow(view, node, dimension, seriesField, lineFields.seriesFields, chartType === 'line' ? markName : undefined);
   return row ? strategy.resolveLeafBounds(view, container, row, ctx) : undefined;
 };
 
@@ -410,7 +410,7 @@ const showTooltipForFocusedNode = (
   const signals = nodeFocusSignals(node);
   if (signals.item != null) {
     // Leaf: full datum for ChartInspect, otherwise a clean axis-titled subset.
-    const row = findFocusedRow(view, node, dimension, series.field, context.seriesFields);
+    const row = findFocusedRow(view, node, dimension, series.field, context.seriesFields, chartType === 'line' ? markName : undefined);
     const fields = [dimension, ...series.labelFields, metric];
     const value = row ? buildLeafTooltipValue(row, markName, hasChartInspect, fieldLabels, fields) : null;
     chartNavStrategies[chartType].showLeafTooltip(container, view, row, value, {
@@ -764,7 +764,7 @@ export const attachDataNavigator = ({
   function activateLeaf(node: NodeObject) {
     const view = getView();
     if (!view || !markName || !dimension) return;
-    const row = findFocusedRow(view, node, dimension, seriesField, lineFields.seriesFields);
+    const row = findFocusedRow(view, node, dimension, seriesField, lineFields.seriesFields, chartType === 'line' ? markName : undefined);
     if (!row) return;
     const bounds = chartNavStrategies[chartType].resolveLeafPopoverBounds(view, row, {
       markName,
@@ -988,8 +988,8 @@ export const attachDataNavigator = ({
       // Overlay marks (e.g. a voronoi cell) wrap the real datum one level deeper.
       const nested = (datum as { datum?: Row }).datum;
       const nodeId =
-        getNodeIdForDatum(chartType, datum as SimpleData, { dimension, seriesField, seriesFields }) ??
-        (nested ? getNodeIdForDatum(chartType, nested as SimpleData, { dimension, seriesField, seriesFields }) : undefined);
+        getNodeIdForDatum(chartType, datum as SimpleData, { dimension, seriesField, seriesFields, markName }) ??
+        (nested ? getNodeIdForDatum(chartType, nested as SimpleData, { dimension, seriesField, seriesFields, markName }) : undefined);
       if (!nodeId || nodeId === current) return;
       const node = structure.nodes[nodeId];
       if (!node) return;

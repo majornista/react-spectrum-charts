@@ -29,6 +29,13 @@ const evalMatchExpr = (
 };
 
 describe('getFocusedGroupOrItemMatchExpr()', () => {
+  test('matches numeric group values against string navigation identities', () => {
+    const expr = getFocusedGroupOrItemMatchExpr('datum.series', 'prefix');
+    expect(evalMatchExpr(expr, { series: 7 }, '7', null)).toBe(true);
+    expect(evalMatchExpr(expr, { series: 7 }, null, '7__rsc__2')).toBe(true);
+    expect(evalMatchExpr(expr, { series: 7 }, '8', null)).toBe(false);
+  });
+
   test('matches when the group itself is the focused dimension, regardless of convention', () => {
     const expr = getFocusedGroupOrItemMatchExpr('datum.series', 'prefix');
     expect(evalMatchExpr(expr, { series: 'A' }, 'A', null)).toBe(true);

@@ -871,7 +871,7 @@ describe('lineSpecBuilder', () => {
         const tableData = resultData.find((d) => d.name === TABLE);
         expect(tableData?.transform).toContainEqual({
           type: 'formula',
-          as: NAVIGATION_INDEX_FIELD,
+          as: `line0_${NAVIGATION_INDEX_FIELD}`,
           expr: `${getNavIndexSignalName('line0')}[datum.${MARK_ID}]`,
         });
       });
@@ -1558,12 +1558,91 @@ describe('lineSpecBuilder', () => {
           view.width(400).height(300);
           view.data(TABLE, rows);
           await view.runAsync();
-          expect(view.data(FILTERED_TABLE).map((row) => row[NAVIGATION_INDEX_FIELD])).toEqual([1, 1, 2, 2]);
+          expect(view.data(FILTERED_TABLE).map((row) => row[`line0_${NAVIGATION_INDEX_FIELD}`])).toEqual([1, 1, 2, 2]);
           view.signal(INTERACTION_MODALITY, 'keyboard');
           view.signal(FOCUSED_ITEM, 'A | Previous | High__rsc__2');
           await view.runAsync();
           expect(view.data('line0_highlightedData')).toHaveLength(1);
           expect(view.data('line0_highlightedData')[0]).toMatchObject({ value: 40, period: 'Previous' });
+        } finally {
+          view.finalize();
+        }
+      });
+
+      test('keeps multiple Lines indexes and inspect filters independent in a running Vega view', async () => {
+        Object.entries(getExpressionFunctions()).forEach(([name, implementation]) => {
+          expressionFunction(name, implementation);
+        });
+        expressionFunction('rscContainerWidth', () => 400);
+        const rows = [
+          { datetime: 0, value: 10, series: 'A', excluded: true },
+          { datetime: 0, value: 20, series: 'B', excluded: false },
+          { datetime: 1, value: 30, series: 'A', excluded: false },
+          { datetime: 1, value: 40, series: 'B', excluded: false },
+        ];
+        const spec = buildSpec({
+          data: rows,
+          accessibleNavigation: true,
+          animations: false,
+          marks: [
+            { markType: 'line', color: 'series', chartInspects: [{ excludeDataKeys: ['excluded'] }] },
+            { markType: 'line' },
+          ],
+        });
+        expect(new Set(spec.data?.map(({ name }) => name)).size).toBe(spec.data?.length);
+        const view = new View(parse(spec), { renderer: 'none' });
+        try {
+          view.width(400).height(300).data(TABLE, rows);
+          await view.runAsync();
+          const liveRows = view.data(FILTERED_TABLE);
+          expect(liveRows.map((row) => row.line0_rscNavIndex)).toEqual([1, 1, 2, 2]);
+          expect(liveRows.map((row) => row.line1_rscNavIndex)).toEqual([1, 2, 3, 4]);
+          expect(view.data('line0_filteredTableForInspect')).toHaveLength(3);
+          expect(view.data('line1_filteredTableForInspect')).toHaveLength(4);
+          view.signal(INTERACTION_MODALITY, 'keyboard').signal(FOCUSED_ITEM, 'A__rsc__2');
+          await view.runAsync();
+          expect(view.data('line0_highlightedData')).toMatchObject([{ value: 30 }]);
+        } finally {
+          view.finalize();
+        }
+      });
+
+      test.each([false, true])('maps composite focus to each legends keys with animations=%s', async (animations) => {
+        Object.entries(getExpressionFunctions()).forEach(([name, implementation]) => {
+          expressionFunction(name, implementation);
+        });
+        expressionFunction('rscContainerWidth', () => 400);
+        const rows = [
+          { datetime: 0, value: 10, series: 7, period: 'Current' },
+          { datetime: 1, value: 20, series: 7, period: 'Previous' },
+          { datetime: 0, value: 30, series: 8, period: 'Current' },
+        ];
+        const spec = buildSpec({
+          data: rows,
+          accessibleNavigation: true,
+          animations,
+          marks: [{ markType: 'line', color: 'series', lineType: 'period', hasOnClick: true }],
+          legends: [{ keys: ['series'] }, { keys: ['period'] }],
+        });
+        const view = new View(parse(spec), { renderer: 'none' });
+        try {
+          view.width(400).height(300).data(TABLE, rows);
+          await view.runAsync();
+          view.signal(INTERACTION_MODALITY, 'keyboard').signal(FOCUSED_DIMENSION, '7 | Previous');
+          await view.runAsync();
+          expect(view.data('legend0_focusedEntries').map((row) => row.legend0Entries)).toEqual([7]);
+          expect(view.data('legend1_focusedEntries').map((row) => row.legend1Entries)).toEqual(['Previous']);
+          expect(view.data(FILTERED_TABLE).map((row) => row.value)).toEqual([10, 20, 30]);
+          if (animations) {
+            expect(view.data('line0_hoverTargetData')).toEqual(expect.arrayContaining([
+              expect.objectContaining({ [SERIES_ID]: '7 | Previous', focusMatch: 1, target: 1 }),
+              expect.objectContaining({ [SERIES_ID]: '8 | Current', focusMatch: 0, target: 0 }),
+            ]));
+          }
+          view.signal(FOCUSED_DIMENSION, null).signal(FOCUSED_ITEM, '8 | Current__rsc__1');
+          await view.runAsync();
+          expect(view.data('legend0_focusedEntries').map((row) => row.legend0Entries)).toEqual([8]);
+          expect(view.data('legend1_focusedEntries').map((row) => row.legend1Entries)).toEqual(['Current']);
         } finally {
           view.finalize();
         }

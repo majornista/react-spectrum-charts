@@ -20,7 +20,7 @@ export const getFocusedGroupOrItemMatchExpr = (matchExpr: string, convention: Fo
     convention === 'prefix'
       ? `indexof(${FOCUSED_ITEM}, (${matchExpr}) + "${NAVIGATION_ID_SEPARATOR}") === 0`
       : getSuffixMatchExpr(matchExpr);
-  return `${FOCUSED_DIMENSION} === ${matchExpr} || (isValid(${FOCUSED_ITEM}) && (${itemMatch}))`;
+  return `${FOCUSED_DIMENSION} === ('' + (${matchExpr})) || (isValid(${FOCUSED_ITEM}) && (${itemMatch}))`;
 };
 
 const getSuffixMatchExpr = (matchExpr: string): string => {

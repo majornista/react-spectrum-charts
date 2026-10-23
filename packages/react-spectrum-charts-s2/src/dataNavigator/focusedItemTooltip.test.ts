@@ -182,6 +182,13 @@ describe('findFocusedLineSceneItem()', () => {
     expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', 'A')).toBeUndefined();
   });
 
+  test('matches numeric rendered facets to string navigation keys', () => {
+    const match = { datum: { series: 7 } };
+    const view = mockLineView([{ datum: { series: 8 } }, match]);
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', '7')).toBe(match);
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', '7', ['series'])).toBe(match);
+  });
+
   // A single-series line has no color field to match on — there's only one line, so any of its rendered items works.
   test('with no color field (single-series), returns the first rendered item regardless of datum', () => {
     const items = [{ datum: { value: 28 } }, { datum: { value: 43 } }];

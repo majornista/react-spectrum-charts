@@ -122,8 +122,8 @@ export const getPointFocusRing = (options: LineSpecOptions): SymbolMark => {
   const seriesId = getLineSeriesIdExpr(options);
   const focusedItemId =
     seriesId
-      ? `${seriesId} + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`
-      : `'' + datum.${NAVIGATION_INDEX_FIELD}`;
+      ? `${seriesId} + "${NAVIGATION_ID_SEPARATOR}" + datum.${name}_${NAVIGATION_INDEX_FIELD}`
+      : `'' + datum.${name}_${NAVIGATION_INDEX_FIELD}`;
   return {
     name: `${name}_pointFocusRing`,
     type: 'symbol',

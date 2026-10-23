@@ -15,6 +15,7 @@ import { Data, Legend, Mark, Scale, Signal } from 'vega';
 import {
   COLOR_SCALE,
   DEFAULT_COLOR_SCHEME,
+  FILTERED_TABLE,
   GROUP_ID,
   HOVERED_SERIES,
   LINEAR_COLOR_SCALE,
@@ -26,7 +27,8 @@ import {
 } from '@spectrum-charts/core-s2/constants';
 import { getS2ColorValue } from '@spectrum-charts/core-s2/tokens';
 
-import { getTableData } from '../data/dataUtils.js';
+import { getSeriesIdTransform, getTableData } from '../data/dataUtils.js';
+import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
 import { addFieldToFacetScaleDomain } from '../scale/scaleSpecBuilder.js';
 import { addHighlightSignalLegendHoverEvents, getGenericValueSignal } from '../signal/signalSpecBuilder.js';
 import { getLineWidthPixelsFromLineWidth, getPathFromSymbolShape, getStrokeDashFromLineType } from '../specUtils.js';
@@ -139,6 +141,18 @@ export const addLegend = produce<
       const uniqueFacetFields = [...new Set(ordinalFacets.map((facet) => facet.field))];
 
       spec.data = addData(spec.data ?? [], { ...legendOptions, facets: uniqueFacetFields });
+      const navigationFacets = spec.usermeta.navigationLineFacets;
+      if (legendOptions.accessibleNavigation && navigationFacets?.length) {
+        const seriesExpr = getSeriesIdTransform(navigationFacets)[0].expr;
+        spec.data.push({
+          name: `${name}_focusedEntries`,
+          source: FILTERED_TABLE,
+          transform: [
+            { type: 'filter', expr: getFocusedGroupOrItemMatchExpr(seriesExpr, 'prefix') },
+            { type: 'formula', as: `${name}Entries`, expr: getSeriesIdTransform(uniqueFacetFields)[0].expr },
+          ],
+        });
+      }
       spec.signals = addSignals(spec.signals ?? [], legendOptions);
       spec.marks = addMarks(spec.marks ?? [], legendOptions);
 

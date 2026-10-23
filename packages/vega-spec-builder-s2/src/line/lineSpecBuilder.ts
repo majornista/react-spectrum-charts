@@ -227,10 +227,12 @@ export const addLine = produce<
     lineOptions.isDrawInAnimate = isLineDrawInSupported(animations, animationTypes, lineOptions);
     spec.usermeta = addUserMetaInteractiveMark(spec.usermeta, lineOptions.interactiveMarkName);
     if (lineOptions.isHoverAnimate) spec.usermeta = addUserMetaAnimatedMark(spec.usermeta, lineName);
-    // Tells the legend's own accessibleNavigation opacity rules that FOCUSED_DIMENSION is keyed by
-    // color/series here (Line's dimension-group level), not by category as it is for Bar.
     if (lineOptions.accessibleNavigation && getFacetsFromOptions(lineOptions).facets.length) {
-      spec.usermeta = { ...spec.usermeta, focusedDimensionIsLegendColor: true };
+      spec.usermeta = {
+        ...spec.usermeta,
+        focusedDimensionIsLegendColor: true,
+        navigationLineFacets: spec.usermeta?.navigationLineFacets ?? facets,
+      };
     }
     spec.data = addData(spec.data ?? [], lineOptions);
     spec.signals = addSignals(spec.signals ?? [], lineOptions);
@@ -315,7 +317,7 @@ export const addData = produce<Data[], [LineSpecOptions]>((data, options) => {
     tableData.transform = tableData.transform ?? [];
     tableData.transform.push({
       type: 'formula',
-      as: NAVIGATION_INDEX_FIELD,
+      as: `${name}_${NAVIGATION_INDEX_FIELD}`,
       expr: `${getNavIndexSignalName(name)}[datum.${MARK_ID}]`,
     });
   }
@@ -400,7 +402,10 @@ const addSegmentData = (data: Data[], tableData: Data, options: LineSpecOptions)
 const addLineHoverData = (data: Data[], options: LineSpecOptions): void => {
   const { accessibleNavigation, chartInspects, highlightedItem, isHoverAnimate, name, seriesIds, showHoverLabel } = options;
   if (isInteractive(options) || highlightedItem !== undefined || accessibleNavigation) {
-    data.push(getLineHighlightedData(options), getFilteredInspectData(chartInspects));
+    data.push(getLineHighlightedData(options), {
+      ...getFilteredInspectData(chartInspects),
+      name: `${name}_${FILTERED_TABLE}ForInspect`,
+    });
     if (showHoverLabel) {
       data.push(getHoverLabelData(options));
     }
@@ -550,7 +555,7 @@ export const addLineMarks = produce<Mark[], [LineSpecOptions]>((marks, options) 
   }
   // hover marks are last so hollow points and interaction marks always render above everything
   if (hasInteractiveHighlight) {
-    marks.push(...getLineHoverMarks(markOptions, `${FILTERED_TABLE}ForInspect`));
+    marks.push(...getLineHoverMarks(markOptions, `${name}_${FILTERED_TABLE}ForInspect`));
   }
   // forecast labels are drawn last so they appear on top of other marks
   addLineForecastLabelMarks(marks, forecasts, options);

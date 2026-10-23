@@ -188,6 +188,11 @@ const getHoverEncodings = (options: LegendSpecOptions, userMeta: UserMeta): Lege
 const getAccessibleNavLegendFocusTest = (userMeta: UserMeta): string =>
   userMeta.focusedDimensionIsLegendColor ? `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})` : `isValid(${FOCUSED_ITEM})`;
 
+const getAccessibleNavLegendMatchExpr = (name: string, userMeta: UserMeta): string =>
+  userMeta.navigationLineFacets?.length
+    ? `indata('${name}_focusedEntries', '${name}Entries', datum.value)`
+    : getFocusedGroupOrItemMatchExpr('datum.value', userMeta.focusedDimensionIsLegendColor ? 'prefix' : 'suffix');
+
 export const getLegendOpacity = (options: LegendSpecOptions, userMeta: UserMeta): ProductionRule<NumericValueRef> | undefined => {
   const rules: ProductionRule<NumericValueRef> = [];
 
@@ -199,7 +204,7 @@ export const getLegendOpacity = (options: LegendSpecOptions, userMeta: UserMeta)
   if (options.accessibleNavigation && userMeta.focusedDimensionIsLegendColor && userMeta.animatedMarks?.length) {
     rules.push({
       test: `${INTERACTION_MODALITY} === 'keyboard' && (${getAccessibleNavLegendFocusTest(userMeta)})`,
-      signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', 'prefix')}) ? 1 : ${FADE_FACTOR}`,
+      signal: `(${getAccessibleNavLegendMatchExpr(options.name, userMeta)}) ? 1 : ${FADE_FACTOR}`,
     });
   }
 
@@ -286,10 +291,9 @@ export const getOpacityEncoding = (
   }
   // A focused line/point (Line) or bar/stack (Bar) keeps its legend entry at full opacity, matching the mark's own focus behavior.
   if (accessibleNavigation && userMeta.interactiveMarks?.length) {
-    const convention = userMeta.focusedDimensionIsLegendColor ? 'prefix' : 'suffix';
     rules.push({
       test: getAccessibleNavLegendFocusTest(userMeta),
-      signal: `(${getFocusedGroupOrItemMatchExpr('datum.value', convention)}) ? 1 : ${FADE_FACTOR}`,
+      signal: `(${getAccessibleNavLegendMatchExpr(legendName, userMeta)}) ? 1 : ${FADE_FACTOR}`,
     });
   }
 

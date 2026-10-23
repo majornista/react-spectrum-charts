@@ -9,8 +9,11 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { Line, LinePointAnnotation } from '../../components/index.js';
-import { findAllMarksByGroupName, findChart, render } from '../../test-utils/index.js';
+import { fireEvent } from '@testing-library/react';
+
+import { Chart } from '../../Chart.js';
+import { Axis, Legend, Line, LinePointAnnotation } from '../../components/index.js';
+import { findAllMarksByGroupName, findChart, render, waitFor } from '../../test-utils/index.js';
 import '../../test-utils/__mocks__/matchMedia.mock.js';
 import { Basic } from './Features/Line.story.js';
 import { LineType, Opacity } from './Features/Styling/LineStyling.story.js';
@@ -23,6 +26,59 @@ describe('LinePointAnnotation', () => {
 });
 
 describe('Line', () => {
+  test.each([undefined, 'linear'] as const)('navigates and activates default fields with scaleType=%s and duplicate x values', async (scaleType) => {
+    const onClick = jest.fn();
+    const data = [
+      { datetime: 0, value: 10 },
+      { datetime: 0, value: 20 },
+      { datetime: 1000, value: 30 },
+    ];
+    render(
+      <Chart data={data} accessibleNavigation animations={false} width={400} height={300}>
+        <Axis position="bottom" title="Time" />
+        <Axis position="left" title="Amount" />
+        <Line scaleType={scaleType} onClick={onClick} />
+      </Chart>
+    );
+    const svg = await findChart();
+    const container = svg.closest('.rsc-container') as HTMLElement;
+    await waitFor(() => expect(container.querySelector('.dn-entry-button')).toBeTruthy());
+    fireEvent.click(container.querySelector('.dn-entry-button') as HTMLElement);
+    const press = (key: string) => fireEvent.keyDown(document.activeElement as HTMLElement, { key, code: key });
+    press('Enter');
+    press('Enter');
+    press('ArrowRight');
+    await waitFor(async () => {
+      const rings = await findAllMarksByGroupName(svg, 'line0_pointFocusRing');
+      expect(rings.filter((ring) => ring.getAttribute('opacity') === '1')).toHaveLength(1);
+    });
+    expect(document.activeElement?.querySelector('.dn-node-text')?.getAttribute('aria-label')).toContain('Amount: 20');
+    press('Enter');
+    expect(onClick).toHaveBeenLastCalledWith(expect.objectContaining({ datetime: 0, value: 20 }));
+  });
+
+  test('renders a whole-line halo for numeric series identities', async () => {
+    render(
+      <Chart data={[
+        { datetime: 0, value: 10, series: 7 },
+        { datetime: 1000, value: 20, series: 7 },
+        { datetime: 0, value: 30, series: 8 },
+      ]} accessibleNavigation animations={false} width={400} height={300}>
+        <Line color="series" />
+        <Legend keys={['series']} />
+      </Chart>
+    );
+    const svg = await findChart();
+    const container = svg.closest('.rsc-container') as HTMLElement;
+    await waitFor(() => expect(container.querySelector('.dn-entry-button')).toBeTruthy());
+    fireEvent.click(container.querySelector('.dn-entry-button') as HTMLElement);
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Enter', code: 'Enter' });
+    await waitFor(async () => {
+      const rings = await findAllMarksByGroupName(svg, 'line0_focusRingOuter');
+      expect(rings.some((ring) => Number(ring.getAttribute('stroke-width')) > 0)).toBe(true);
+    });
+  });
+
   // Line is not a real React component. This is test just provides test coverage for sonarqube
   test('Line pseudo element', () => {
     render(<Line />);

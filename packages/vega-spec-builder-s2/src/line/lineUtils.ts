@@ -54,8 +54,11 @@ export const isDualMetricAxis = (options: { dualMetricAxis?: boolean }): boolean
 };
 
 /** Gets the rendered line's field-backed series identity expression. */
-export const getLineSeriesIdExpr = (options: Pick<LineMarkOptions, 'color' | 'lineType' | 'opacity'>): string | undefined =>
-  getSeriesIdTransform(getFacetsFromOptions(options).facets)[0]?.expr;
+export const getLineSeriesIdExpr = (options: Pick<LineMarkOptions, 'color' | 'lineType' | 'opacity'>): string | undefined => {
+  const { facets } = getFacetsFromOptions(options);
+  const expr = getSeriesIdTransform(facets)[0]?.expr;
+  return facets.length === 1 ? `toString(${expr})` : expr;
+};
 
 export interface LineMarkOptions {
   /** Experimental: keyboard navigation focus signals drive hover-style highlight/fade when true. */

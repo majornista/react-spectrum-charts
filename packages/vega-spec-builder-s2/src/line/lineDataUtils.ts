@@ -40,8 +40,8 @@ import { getLineSeriesIdExpr } from './lineUtils.js';
 const getFocusedItemMatchExpr = (options: LineSpecOptions): string => {
   const seriesId = getLineSeriesIdExpr(options);
   const focusedId = seriesId
-    ? `${seriesId} + "${NAVIGATION_ID_SEPARATOR}" + datum.${NAVIGATION_INDEX_FIELD}`
-    : `'' + datum.${NAVIGATION_INDEX_FIELD}`;
+    ? `${seriesId} + "${NAVIGATION_ID_SEPARATOR}" + datum.${options.name}_${NAVIGATION_INDEX_FIELD}`
+    : `'' + datum.${options.name}_${NAVIGATION_INDEX_FIELD}`;
   return `${FOCUSED_ITEM} === ${focusedId}`;
 };
 
@@ -168,8 +168,9 @@ export const getLineStaticPointData = (
  * @returns HoverMatchRule[] - the hover interaction rules
  */
 export const getLineHoverRules = (
-  { accessibleNavigation, color, interactiveMarkName, popoverMarkName, comboSiblingNames, isHighlightedByGroup }: LineSpecOptions
+  options: LineSpecOptions
 ): HoverMatchRule[] => {
+  const { accessibleNavigation, interactiveMarkName, popoverMarkName, comboSiblingNames, isHighlightedByGroup } = options;
   const rules: HoverMatchRule[] = [];
 
   if (interactiveMarkName) {
@@ -201,9 +202,9 @@ export const getLineHoverRules = (
   // hover-animation engine (used whenever this line is "animated" — e.g. has a popover, inspect,
   // or click handler) computes its own opacity signal, bypassing getLineOpacityRules entirely —
   // this keeps keyboard focus reflected either way.
-  if (accessibleNavigation && typeof color === 'string') {
+  if (accessibleNavigation && getLineSeriesIdExpr(options)) {
     const focusMatchExpr = `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM}) ? (${getFocusedGroupOrItemMatchExpr(
-      `datum.${color}`,
+      `datum.${SERIES_ID}`,
       'prefix'
     )} ? 1 : 0) : null`;
     rules.push({ as: 'focusMatch', expr: focusMatchExpr });

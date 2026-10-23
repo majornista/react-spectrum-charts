@@ -65,8 +65,8 @@ const lineNavigationRules: NavigationRules = {
 };
 
 /** The data-navigator leaf id for a rendered point's datum — the inverse of the per-line indexing below. */
-export const getLineNodeId = (datum: SimpleData, color?: string, seriesFields: string[] = []): string | undefined => {
-  const index = datum[NAVIGATION_INDEX_FIELD];
+export const getLineNodeId = (datum: SimpleData, color?: string, seriesFields: string[] = [], markName?: string): string | undefined => {
+  const index = datum[markName ? `${markName}_${NAVIGATION_INDEX_FIELD}` : NAVIGATION_INDEX_FIELD];
   if (index == null) return undefined;
   const key = seriesFields.length > 1 ? getSeriesKey(datum, seriesFields) : color ? datum[color] : undefined;
   return color ? segmentId(key, index) : String(index);

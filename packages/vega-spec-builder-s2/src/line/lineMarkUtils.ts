@@ -353,16 +353,8 @@ export const getLineOpacityRules = (options: LineMarkOptions): ProductionRule<Nu
 /**
  * Gets the production rules for strokeWidth
  */
-export const getLineStrokeWidth = ({
-  accessibleNavigation,
-  color,
-  displayOnHover,
-  comboSiblingNames,
-  interactiveMarkName,
-  popoverMarkName,
-  isHighlightedByGroup,
-  highlightedItem,
-}: LineMarkOptions): ProductionRule<NumericValueRef> => {
+export const getLineStrokeWidth = (options: LineMarkOptions): ProductionRule<NumericValueRef> => {
+  const { accessibleNavigation, displayOnHover, comboSiblingNames, interactiveMarkName, popoverMarkName, isHighlightedByGroup, highlightedItem } = options;
   // No interactivity -> use default (no hover)
   if ((!interactiveMarkName || displayOnHover) && highlightedItem === undefined) return [DEFAULT_STROKE_WIDTH_RULE];
   const strokeWidthRules: ProductionRule<NumericValueRef> = [];
@@ -410,8 +402,9 @@ export const getLineStrokeWidth = ({
     });
   }
 
-  if (accessibleNavigation && typeof color === 'string') {
-    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${color}`, 'prefix');
+  const seriesId = getLineSeriesIdExpr(options);
+  if (accessibleNavigation && seriesId) {
+    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(seriesId, 'prefix');
     strokeWidthRules.push({
       test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
       signal: `(${focusMatchExpr}) ? ${CHART_SIZE_HOVER_STROKE_WIDTH} : ${CHART_SIZE_STROKE_WIDTH}`,

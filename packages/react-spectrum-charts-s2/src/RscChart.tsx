@@ -27,6 +27,7 @@ import {
   COMPONENT_NAME,
   DEFAULT_CATEGORICAL_DIMENSION,
   DEFAULT_METRIC,
+  DEFAULT_TIME_DIMENSION,
   DEFAULT_SYMBOL_SHAPES,
   DEFAULT_SYMBOL_SIZES,
   FOCUSED_DIMENSION,
@@ -233,6 +234,8 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   // Line's dimension defaults to the time dimension unless it's been explicitly given a discrete scaleType.
   const navScaleType = navChartType === 'line' ? navFields?.scaleType ?? 'time' : undefined;
   const navIsTimeDimension = navChartType === 'line' ? navScaleType === 'time' : undefined;
+  const navDimension = navFields?.dimension ?? (navIsTimeDimension ? DEFAULT_TIME_DIMENSION : DEFAULT_CATEGORICAL_DIMENSION);
+  const navMetric = navFields?.metric ?? DEFAULT_METRIC;
 
   // Axis/legend titles keyed by the field they represent, so a focused bar's accessible name and
   // (for bars without a ChartInspect) its focus tooltip read as the chart's own titles rather than
@@ -248,15 +251,15 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
     const dimensionTitle = titleAt(isHorizontal ? 'left' : 'bottom');
     const metricTitle = titleAt(isHorizontal ? 'bottom' : 'left');
     const labels: Record<string, string> = {};
-    if (dimensionTitle) labels[navFields?.dimension ?? DEFAULT_CATEGORICAL_DIMENSION] = dimensionTitle;
+    if (dimensionTitle) labels[navDimension] = dimensionTitle;
     if (navColor && (legendTitle || dimensionTitle || metricTitle)) {
       labels[navColor] = legendTitle ?? navColor;
       // The other series fields (e.g. a time-comparison period) tell series apart too, so they're read under their own names.
       for (const field of navSeries.seriesFields) labels[field] ??= field;
     }
-    if (metricTitle) labels[navFields?.metric ?? DEFAULT_METRIC] = metricTitle;
+    if (metricTitle) labels[navMetric] = metricTitle;
     return labels;
-  }, [sanitizedChildren, navOrientation, navFields?.dimension, navFields?.metric, navColor, navSeries, legendTitle]);
+  }, [sanitizedChildren, navOrientation, navDimension, navMetric, navColor, navSeries, legendTitle]);
 
   const navMetricTitleBySeries = useMemo(() => {
     // Mirrors vega-spec-builder-s2's isDualMetricAxis (barUtils.ts) — keep the two in sync.
@@ -390,7 +393,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
           <Navigator
             chartType={navChartType}
             data={data as SimpleData[]}
-            dimension={navFields?.dimension}
+            dimension={navDimension}
             color={navColor}
             seriesFields={navSeries.seriesFields}
             dodgeFields={navSeries.dodgeFields}
@@ -398,7 +401,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             type={navFields?.type}
             colorOverride={navColorOverride}
             locale={typeof locale === 'string' ? locale : undefined}
-            metric={navFields?.metric}
+            metric={navMetric}
             metricAxis={navFields?.metricAxis}
             dualMetricAxis={navDualMetricAxis}
             order={navFields?.order}

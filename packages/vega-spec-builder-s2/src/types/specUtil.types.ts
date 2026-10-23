@@ -56,8 +56,9 @@ export type UserMeta = {
   chartOrientation?: Orientation;
   metricAxisCount?: number;
   patches?: Partial<Config>[];
-  /** True when accessibleNavigation's FOCUSED_DIMENSION signal shares the legend's color domain (Line: the dimension-group level is keyed by color/series), false/unset when it's a different domain (Bar: keyed by category). */
+  /** Whether Line navigation registers series-level focus and interaction modality signals. */
   focusedDimensionIsLegendColor?: boolean;
+  navigationLineFacets?: string[];
 };
 
 export interface MarkBounds {

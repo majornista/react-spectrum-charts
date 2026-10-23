@@ -317,7 +317,7 @@ describe('getLineOpacity()', () => {
         isHoverAnimate: true,
         accessibleNavigation: true,
       });
-      const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${defaultLineMarkOptions.color}`, 'prefix');
+      const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`toString(datum.${defaultLineMarkOptions.color})`, 'prefix');
       expect(opacityRule).toStrictEqual([
         {
           test: `${INTERACTION_MODALITY} === 'keyboard' && (isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM}))`,
@@ -334,7 +334,7 @@ describe('getLineOpacity()', () => {
       interactiveMarkName: 'line0',
       accessibleNavigation: true,
     }) as { test?: string; signal?: string }[];
-    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${defaultLineMarkOptions.color}`, 'prefix');
+    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`toString(datum.${defaultLineMarkOptions.color})`, 'prefix');
     expect(opacityRule.at(-2)).toStrictEqual({
       test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
       signal: `(${focusMatchExpr}) ? 1 : ${FADE_FACTOR}`,
@@ -344,6 +344,24 @@ describe('getLineOpacity()', () => {
 });
 
 describe('getLineStrokeWidth()', () => {
+  test.each(['lineType', 'opacity'] as const)('matches the complete %s facet with field-backed or static color', (facet) => {
+    for (const color of ['series', { value: 'categorical-100' }] as const) {
+      const result = getLineStrokeWidth({
+        ...defaultLineMarkOptions,
+        accessibleNavigation: true,
+        interactiveMarkName: 'line0',
+        color,
+        [facet]: 'period',
+      });
+      const seriesExpr = typeof color === 'string' ? 'datum.series + " | " + datum.period' : 'toString(datum.period)';
+      const matchExpr = getFocusedGroupOrItemMatchExpr(seriesExpr, 'prefix');
+      expect(result).toContainEqual({
+        test: `isValid(${FOCUSED_DIMENSION}) || isValid(${FOCUSED_ITEM})`,
+        signal: `(${matchExpr}) ? ${CHART_SIZE_HOVER_STROKE_WIDTH} : ${CHART_SIZE_STROKE_WIDTH}`,
+      });
+    }
+  });
+
   test('should return the default stroke width rule when no interactivity', () => {
     expect(getLineStrokeWidth(defaultLineMarkOptions)).toEqual([DEFAULT_STROKE_WIDTH_RULE]);
   });
@@ -434,7 +452,7 @@ describe('getLineStrokeWidth()', () => {
       chartInspects: [{}],
       accessibleNavigation: true,
     }) as { test?: string; signal?: string }[];
-    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`datum.${defaultLineMarkOptions.color}`, 'prefix');
+    const focusMatchExpr = getFocusedGroupOrItemMatchExpr(`toString(datum.${defaultLineMarkOptions.color})`, 'prefix');
     expect(result[0]).toStrictEqual({
       test: `isValid(line0_${HOVERED_ITEM}) && ${INTERACTION_MODALITY} !== 'keyboard'`,
       signal: `line0_${HOVERED_ITEM}.${SERIES_ID} === datum.${SERIES_ID} ? ${CHART_SIZE_HOVER_STROKE_WIDTH} : ${CHART_SIZE_STROKE_WIDTH}`,
