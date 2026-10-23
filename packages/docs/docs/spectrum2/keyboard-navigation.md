@@ -14,6 +14,8 @@ Keyboard navigation currently supports plain, stacked, dodged, and dual-metric-a
 
 Set `accessibleNavigation` on `Chart` to let keyboard users navigate chart content — individual bars, stacked segments, or line points — and their tooltips and popovers, without a mouse.
 
+When a chart contains multiple marks, navigation targets only the first supported `Bar` or `Line`. Other marks do not receive keyboard focus indicators.
+
 ```jsx
 <Chart data={data} accessibleNavigation>
   <Axis position="bottom" baseline title="Browser" />
@@ -87,3 +89,5 @@ Every `Line` — single- or multi-series — has a line-level focus stop between
 When `color`, `lineType`, or `opacity` reference data fields, their combined values identify each navigable line. Static `{ value: ... }` encodings do not create separate series.
 
 Since a line's points have no persistent rendered mark of their own (the line is one continuous path), a focused point's tooltip and popover are positioned by projecting its data value through the chart's own scales, rather than by reading a rendered mark's bounds.
+
+Projection uses the same transformed time dimension and forecast-aware metric as the rendered Line. Keyboard tooltips honor the chart's `tooltipAnchor` and `tooltipPlacement` settings.

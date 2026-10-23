@@ -10,9 +10,10 @@
  * governing permissions and limitations under the License.
  */
 import { fireEvent } from '@testing-library/react';
+import { View } from 'vega';
 
 import { Chart } from '../../Chart.js';
-import { Axis, Legend, Line, LinePointAnnotation } from '../../components/index.js';
+import { Axis, Legend, Line, LineForecast, LinePointAnnotation } from '../../components/index.js';
 import { findAllMarksByGroupName, findChart, render, waitFor } from '../../test-utils/index.js';
 import '../../test-utils/__mocks__/matchMedia.mock.js';
 import { Basic } from './Features/Line.story.js';
@@ -26,6 +27,50 @@ describe('LinePointAnnotation', () => {
 });
 
 describe('Line', () => {
+  test('anchors forecast navigation to the rendered time and effective metric without changing callback data', async () => {
+    let view: View | undefined;
+    const onClick = jest.fn();
+    render(
+      <Chart
+        data={[
+          { datetime: 1500, value: 10, forecastValue: null },
+          { datetime: 2500, value: null, forecastValue: 42 },
+          { datetime: 3500, value: null, forecastValue: 50 },
+        ]}
+        accessibleNavigation animations={false} width={400} height={300}
+        onVegaViewReady={(nextView) => { view = nextView; }}
+      >
+        <Line name="Sales Trend" onClick={onClick}>
+          <LineForecast metric="forecastValue" start={2000} />
+        </Line>
+      </Chart>
+    );
+    const svg = await findChart();
+    const container = svg.closest('.rsc-container') as HTMLElement;
+    await waitFor(() => {
+      expect(view).toBeDefined();
+      expect(container.querySelector('.dn-entry-button')).toBeTruthy();
+    });
+    if (!view) throw new Error('Expected a rendered Vega view');
+    fireEvent.click(container.querySelector('.dn-entry-button') as HTMLElement);
+    const press = (key: string) => fireEvent.keyDown(document.activeElement as HTMLElement, { key, code: key });
+    press('Enter');
+    press('Enter');
+    press('ArrowRight');
+    const [originX, originY] = view.origin();
+    const x = view.scale('xTime')(2000);
+    const y = view.scale('yLinear')(42);
+    await waitFor(() => {
+      const overlay = document.activeElement as HTMLElement;
+      expect(Number.parseFloat(overlay.style.left)).toBeCloseTo(originX + x - 4);
+      expect(Number.parseFloat(overlay.style.top)).toBeCloseTo(originY + y - 4);
+    });
+    press('Enter');
+    expect(onClick).toHaveBeenLastCalledWith(expect.objectContaining({
+      datetime: 2500, value: null, forecastValue: 42, salesTrend_effectiveValue: 42,
+    }));
+  });
+
   test.each([
     { scaleType: undefined, name: undefined, markName: 'line0' },
     { scaleType: 'linear', name: undefined, markName: 'line0' },

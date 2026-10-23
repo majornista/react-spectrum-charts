@@ -644,7 +644,7 @@ const addLineGroupMark = (
 const addLineStaticPointMarks = (marks: Mark[], options: LineSpecOptions): void => {
   const { accessibleNavigation, isSparkline, linePointAnnotations, staticPoint } = options;
   if (accessibleNavigation) {
-    marks.push(getPointFocusRing(options));
+    marks.push(getPointFocusRing({ ...options, metric: getEffectiveMetricField(options) }));
     addChartFocusRing(marks, options);
   }
   if (!staticPoint && !isSparkline) return;

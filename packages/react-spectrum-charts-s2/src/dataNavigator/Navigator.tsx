@@ -41,6 +41,8 @@ export interface NavigatorProps {
   locale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
+  /** Line-only: rendered metric field used for projected bounds, separate from accessible labels. */
+  plottingMetric?: string;
   /** Line-only: the metric scale name and whether it has primary/secondary scales. */
   metricAxis?: string;
   dualMetricAxis?: boolean;
@@ -94,6 +96,7 @@ export const Navigator = ({
   colorOverride,
   locale,
   metric,
+  plottingMetric,
   metricAxis,
   dualMetricAxis,
   order,
@@ -135,6 +138,7 @@ export const Navigator = ({
         colorOverride,
         locale,
         metric,
+        plottingMetric,
         metricAxis,
         dualMetricAxis,
         order,
@@ -182,6 +186,7 @@ export const Navigator = ({
     colorOverride,
     locale,
     metric,
+    plottingMetric,
     metricAxis,
     dualMetricAxis,
     order,

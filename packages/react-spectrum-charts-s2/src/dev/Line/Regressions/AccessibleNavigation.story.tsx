@@ -14,7 +14,7 @@ import { ReactElement } from 'react';
 import { StoryFn } from '@storybook/react';
 
 import { Chart } from '../../../Chart.js';
-import { Axis, ChartInspect, ChartPopover, Legend, Line } from '../../../components/index.js';
+import { Axis, ChartInspect, ChartPopover, Legend, Line, LineForecast } from '../../../components/index.js';
 import useChartProps from '../../../hooks/useChartProps.js';
 import { bindWithProps } from '../../../test-utils/index.js';
 
@@ -59,4 +59,37 @@ FacetedNavigation.parameters = {
   },
 };
 
-export { FacetedNavigation };
+const ForecastNavigationStory: StoryFn<typeof Line> = (args): ReactElement => {
+  const chartProps = useChartProps({
+    data: [1500, 2500, 3500, 4500].map((datetime, index) => ({
+      datetime,
+      value: index < 2 ? 10 + index * 5 : null,
+      forecastValue: index >= 2 ? 20 + index * 5 : null,
+      referenceValue: 10 + index * 2,
+    })),
+    accessibleNavigation: true, height: 400, minWidth: 300, maxWidth: 800,
+  });
+  return (
+    <Chart {...chartProps} tooltipAnchor="mark" tooltipPlacement="right">
+      <Axis position="bottom" labelFormat="time" title="Time" />
+      <Axis position="left" title="Value" />
+      <Line {...args}>
+        <LineForecast metric="forecastValue" start={3000} />
+        <ChartInspect>{(datum) => <div>{String(datum.value ?? datum.forecastValue)}</div>}</ChartInspect>
+        <ChartPopover>{(datum) => <div>{String(datum.value ?? datum.forecastValue)}</div>}</ChartPopover>
+      </Line>
+      <Line metric="referenceValue" />
+    </Chart>
+  );
+};
+
+const ForecastNavigation = bindWithProps(ForecastNavigationStory);
+ForecastNavigation.args = { name: 'Sales Trend' };
+ForecastNavigation.parameters = {
+  regression: {
+    description: 'Only the first Line receives keyboard focus, with forecast overlays and mark-anchored tooltips aligned to sub-second data.',
+    pr: 4,
+  },
+};
+
+export { FacetedNavigation, ForecastNavigation };

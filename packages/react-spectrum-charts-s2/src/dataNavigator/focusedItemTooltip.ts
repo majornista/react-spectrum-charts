@@ -12,6 +12,7 @@
 import { View } from 'vega';
 
 import { DIMENSION_HOVER_AREA, MARK_ID } from '@spectrum-charts/core-s2/constants';
+import { MarkBounds } from '@spectrum-charts/vega-spec-builder-s2';
 
 import { findAxisLabelItem } from './axisLabelGeometry.js';
 import { Row } from './barHoverParity.js';
@@ -178,16 +179,13 @@ export const showFocusedItemTooltip = (container: HTMLElement, view: View, ringM
   tooltipCallback(fakeHandler, syntheticEvent, ringItem, value);
 };
 
-/**
- * Same as `showFocusedItemTooltip`, but for a mark with no rendered focus-ring item to read bounds
- * from (e.g. a Line point, which has no persistent rendered scene item) — takes a precomputed
- * page-absolute position instead.
- */
+/** Shows a focused point's tooltip using projected bounds for mark anchoring and a client position for cursor anchoring. */
 export const showFocusedItemTooltipAtPosition = (
   container: HTMLElement,
   view: View,
   position: { clientX: number; clientY: number },
-  value: unknown
+  value: unknown,
+  bounds: MarkBounds
 ): void => {
   const tooltipCallback = getRegisteredTooltipCallback(view);
   if (!tooltipCallback) return;
@@ -200,6 +198,6 @@ export const showFocusedItemTooltipAtPosition = (
   const [originX, originY] = view.origin();
   const fakeHandler = { _el: container, _origin: [originX, originY] };
   const syntheticEvent = { type: 'focus', ...position };
-  // No real scene item exists for a Line point; vega-tooltip's positioning only reads clientX/clientY off the event.
-  tooltipCallback(fakeHandler, syntheticEvent, undefined, value);
+  const item = { bounds, mark: {} };
+  tooltipCallback(fakeHandler, syntheticEvent, item, value);
 };

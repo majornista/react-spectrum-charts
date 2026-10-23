@@ -9,7 +9,7 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { Data, GroupMark } from 'vega';
+import { Data, GroupMark, View, expressionFunction, parse } from 'vega';
 
 import { colorSchemes, spectrum2Colors } from '@spectrum-charts/core-s2/tokens';
 
@@ -32,13 +32,16 @@ import {
   DEFAULT_SECONDARY_COLOR,
   FADE_FACTOR,
   FILTERED_TABLE,
+  FOCUSED_DIMENSION,
   FOCUSED_ITEM,
+  INTERACTION_MODALITY,
   LINE_TYPE_SCALE,
   LINE_WIDTH_SCALE,
   MARK_ID,
   OPACITY_SCALE,
   ROUNDED_SQUARE_PATH,
   SERIES_ID,
+  SINGLE_LINE_NODE_ID,
   SYMBOL_SHAPE_SCALE,
   SYMBOL_SIZE_SCALE,
   TABLE,
@@ -63,6 +66,7 @@ import { defaultSignals } from './specTestUtils.js';
 import { baseData } from './specUtils.js';
 import { BarOptions, ChartSpecOptions, LineType } from './types/index.js';
 import { CHART_FOCUS_RING_NAME } from './marks/chartFocusRingUtils.js';
+import { getExpressionFunctions } from './expressionFunctions/index.js';
 
 const defaultData: Data[] = [{ name: TABLE, values: [], transform: [{ type: 'identifier', as: MARK_ID }] }];
 
@@ -453,6 +457,137 @@ describe('Chart spec builder', () => {
   });
 
   describe('accessibleNavigation dedup across mark types', () => {
+    type SceneNode = {
+      name?: string;
+      mark?: { name?: string };
+      items?: SceneNode[];
+      opacity?: number;
+      strokeWidth?: number;
+      y?: number;
+    };
+    const getSceneItems = (view: View, name: string): SceneNode[] => {
+      const visit = (node: SceneNode): SceneNode[] => [
+        ...(node.mark?.name === name ? [node] : []),
+        ...(node.items?.flatMap(visit) ?? []),
+      ];
+      const scene = view.scenegraph() as unknown as { root: SceneNode };
+      return visit(scene.root);
+    };
+
+    beforeEach(() => {
+      Object.entries(getExpressionFunctions()).forEach(([name, implementation]) => {
+        expressionFunction(name, implementation);
+      });
+      expressionFunction('rscContainerWidth', () => 400);
+      expressionFunction('getLabelWidth', () => 40);
+    });
+
+    test('only the first unfaceted line responds to point and division focus', async () => {
+      const rows = [
+        { datetime: 0, value: 10, second: 30 },
+        { datetime: 1, value: 20, second: 40 },
+      ];
+      const spec = buildSpec({
+        data: rows,
+        accessibleNavigation: true,
+        animations: false,
+        marks: [
+          { markType: 'line', metric: 'value', chartInspects: [{}] },
+          { markType: 'line', metric: 'second', chartInspects: [{}] },
+        ],
+      });
+      const view = new View(parse(spec), { renderer: 'none' });
+      try {
+        view.width(400).height(300).data(TABLE, rows);
+        await view.runAsync();
+        view.signal(INTERACTION_MODALITY, 'keyboard').signal(FOCUSED_ITEM, '2');
+        await view.runAsync();
+        expect(getSceneItems(view, 'line0_pointFocusRing').filter(({ opacity }) => opacity === 1)).toHaveLength(1);
+        expect(getSceneItems(view, 'line1_pointFocusRing')).toHaveLength(0);
+        expect(view.data('line0_highlightedData')).toMatchObject([{ value: 20 }]);
+        expect(view.data('line1_highlightedData')).toHaveLength(0);
+
+        view.signal(FOCUSED_ITEM, null).signal(FOCUSED_DIMENSION, SINGLE_LINE_NODE_ID);
+        await view.runAsync();
+        expect(getSceneItems(view, 'line0_focusRingOuter').every(({ strokeWidth }) => strokeWidth === 12)).toBe(true);
+        expect(getSceneItems(view, 'line0_focusRingOuter')).not.toHaveLength(0);
+        expect(getSceneItems(view, 'line1_focusRingOuter')).toHaveLength(0);
+        expect(view.data('line1_highlightedData')).toHaveLength(0);
+
+        view.signal(FOCUSED_DIMENSION, null);
+        await view.runAsync();
+        expect(getSceneItems(view, 'line0_focusRingOuter').every(({ strokeWidth }) => strokeWidth === 0)).toBe(true);
+        expect(view.data('line0_highlightedData')).toHaveLength(0);
+
+        view.signal(INTERACTION_MODALITY, 'pointer').signal('line1_hoveredItem', view.data(FILTERED_TABLE)[0]);
+        await view.runAsync();
+        expect(view.data('line1_highlightedData')).toMatchObject([{ second: 30 }]);
+      } finally {
+        view.finalize();
+      }
+    });
+
+    test.each([true, false])('mixed marks keep navigation on the first supported mark (barFirst=%s)', async (barFirst) => {
+      const rows = [{ datetime: 0, value: 10, series: 'A' }, { datetime: 1, value: 20, series: 'B' }];
+      const bar: BarOptions = { markType: 'bar', dimension: 'datetime', metric: 'value', color: 'series' };
+      const line = { markType: 'line' as const, dimension: 'datetime', metric: 'value', color: 'series', chartInspects: [{}] };
+      const spec = buildSpec({
+        data: rows,
+        accessibleNavigation: true,
+        animations: false,
+        marks: barFirst ? [bar, line] : [line, bar],
+        legends: [{}],
+      });
+      const view = new View(parse(spec), { renderer: 'none' });
+      try {
+        view.width(400).height(300).data(TABLE, rows);
+        await view.runAsync();
+        view.signal(FOCUSED_DIMENSION, barFirst ? '0' : 'A');
+        if (!barFirst) view.signal(INTERACTION_MODALITY, 'keyboard');
+        await view.runAsync();
+        expect(spec.usermeta?.focusedDimensionIsLegendColor ?? false).toBe(!barFirst);
+        expect(getSceneItems(view, 'line0_pointFocusRing').length > 0).toBe(!barFirst);
+        expect(getSceneItems(view, 'bar0_focusRing').length > 0).toBe(barFirst);
+        if (barFirst) {
+          expect(view.data('line0_highlightedData')).toHaveLength(0);
+          view.signal(FOCUSED_DIMENSION, null).signal(FOCUSED_ITEM, '0__rsc__A');
+          await view.runAsync();
+          expect(getSceneItems(view, 'bar0_focusRing').filter(({ opacity }) => opacity === 1)).toHaveLength(1);
+        } else {
+          expect(getSceneItems(view, 'line0_focusRingOuter').some(({ strokeWidth }) => strokeWidth === 12)).toBe(true);
+        }
+      } finally {
+        view.finalize();
+      }
+    });
+
+    test('forecast-only point focus ring uses the visible point metric', async () => {
+      const rows = [
+        { datetime: 0, value: 10, forecastValue: null },
+        { datetime: 1, value: null, forecastValue: 42 },
+      ];
+      const spec = buildSpec({
+        data: rows,
+        accessibleNavigation: true,
+        animations: false,
+        marks: [{ markType: 'line', forecasts: [{ metric: 'forecastValue', start: 1 }] }],
+      });
+      const view = new View(parse(spec), { renderer: 'none' });
+      try {
+        view.width(400).height(300).data(TABLE, rows);
+        await view.runAsync();
+        view.signal(INTERACTION_MODALITY, 'keyboard').signal(FOCUSED_ITEM, '2');
+        await view.runAsync();
+        const [ring] = getSceneItems(view, 'line0_pointFocusRing').filter(({ opacity }) => opacity === 1);
+        const [point] = getSceneItems(view, 'line0_point_highlight');
+        expect(ring?.y).toBeCloseTo(view.scale('yLinear')(42));
+        expect(ring?.y).toBe(point?.y);
+        expect(view.data('line0_highlightedData')).toMatchObject([{ line0_effectiveValue: 42 }]);
+      } finally {
+        view.finalize();
+      }
+    });
+
     test('a chart with both a Bar and a Line mark produces exactly one FOCUSED_ITEM signal and one chartFocusRing mark', () => {
       const spec = buildSpec({
         ...defaultSpecOptions,

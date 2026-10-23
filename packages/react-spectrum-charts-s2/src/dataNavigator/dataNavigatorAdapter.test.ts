@@ -16,6 +16,7 @@ import { View } from 'vega';
 
 import {
   COMPONENT_NAME,
+  DEFAULT_TRANSFORMED_TIME_DIMENSION,
   DIMENSION_HOVER_AREA,
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
@@ -1366,8 +1367,8 @@ describe('attachDataNavigator()', () => {
 
   describe('line charts', () => {
     const lineData = [
-      { datetime: 0, value: 28, line0_rscNavIndex: 1 },
-      { datetime: 1, value: 43, line0_rscNavIndex: 2 },
+      { datetime: 0, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 0, value: 28, line0_rscNavIndex: 1 },
+      { datetime: 1, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 1, value: 43, line0_rscNavIndex: 2 },
     ];
 
     const attachLine = (overrides = {}) =>
@@ -1417,6 +1418,36 @@ describe('attachDataNavigator()', () => {
       expect(entryButton()).toBeTruthy();
     });
 
+    test('uses transformed time and forecast metric for overlay, tooltip and popover without replacing callback fields', async () => {
+      const rows = [{
+        datetime: 1500,
+        [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 1000,
+        value: null,
+        forecastValue: 42,
+        line0_effectiveValue: 42,
+        line0_rscNavIndex: 1,
+      }];
+      (view.data as jest.Mock).mockReturnValue(rows);
+      const selectedDataBounds = { current: { x1: 0, x2: 0, y1: 0, y2: 0 } };
+      const onNodeClick = jest.fn();
+      attachLine({ data: rows, plottingMetric: 'line0_effectiveValue', selectedDataBounds, onNodeClick });
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(focused().style.left).toBe('9996px');
+      expect(focused().style.top).toBe('80px');
+      await Promise.resolve();
+      expect(tooltipCallback).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ clientX: 10000, clientY: 84 }),
+        expect.objectContaining({ bounds: { x1: 9996, x2: 10004, y1: 80, y2: 88 } }),
+        expect.anything()
+      );
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(selectedDataBounds.current).toStrictEqual({ x1: 9996, x2: 10004, y1: 80, y2: 88 });
+      expect(onNodeClick).toHaveBeenLastCalledWith(expect.objectContaining({ datetime: 1500, value: null, forecastValue: 42 }));
+    });
+
     test('navigates and activates same-color facet series independently of the view series id', async () => {
       const data = [
         { datetime: 0, value: 10, series: 'A', period: 'Current' },
@@ -1426,6 +1457,7 @@ describe('attachDataNavigator()', () => {
       ];
       const rows = data.map((row, index) => ({
         ...row,
+        [DEFAULT_TRANSFORMED_TIME_DIMENSION]: row.datetime,
         [SERIES_ID]: `view-series-${index}`,
         [`line0_${NAVIGATION_INDEX_FIELD}`]: Math.floor(index / 2) + 1,
       }));
@@ -1450,7 +1482,8 @@ describe('attachDataNavigator()', () => {
       await Promise.resolve();
       expect(tooltipCallback).toHaveBeenLastCalledWith(
         expect.anything(), expect.objectContaining({ clientX: 10, clientY: 80 }),
-        undefined, expect.objectContaining({ series: 'A', period: 'Previous' })
+        expect.objectContaining({ bounds: { x1: 6, x2: 14, y1: 76, y2: 84 } }),
+        expect.objectContaining({ series: 'A', period: 'Previous' })
       );
       fireViewEvent('mousedown', { datum: rows[2] });
       expect(signal(FOCUSED_ITEM)).toBe(segmentId('A | Current', 2));
@@ -1465,8 +1498,8 @@ describe('attachDataNavigator()', () => {
       { metricAxis: 'yCustom', dualMetricAxis: true, lastSeries: 'B', expectedScale: 'yCustomSecondary', factor: 20 },
     ])('anchors overlay, tooltip and popover using $expectedScale', async (options) => {
       const data = [
-        { datetime: 0, value: 28, series: 'A', [SERIES_ID]: 'A', line0_rscNavIndex: 1 },
-        { datetime: 0, value: 43, series: 'B', [SERIES_ID]: 'B', line0_rscNavIndex: 1 },
+        { datetime: 0, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 0, value: 28, series: 'A', [SERIES_ID]: 'A', line0_rscNavIndex: 1 },
+        { datetime: 0, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 0, value: 43, series: 'B', [SERIES_ID]: 'B', line0_rscNavIndex: 1 },
       ];
       (view.data as jest.Mock).mockReturnValue(data);
       signal(LAST_RSC_SERIES_ID, options.lastSeries);
@@ -1490,7 +1523,8 @@ describe('attachDataNavigator()', () => {
       expect(focused().style.top).toBe(`${y - 4}px`);
       await Promise.resolve();
       expect(tooltipCallback).toHaveBeenLastCalledWith(
-        expect.anything(), expect.objectContaining({ clientX: 0, clientY: y }), undefined, expect.anything()
+        expect.anything(), expect.objectContaining({ clientX: 0, clientY: y }),
+        expect.objectContaining({ bounds: { x1: -4, x2: 4, y1: y - 4, y2: y + 4 } }), expect.anything()
       );
       fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
       expect(selectedDataBounds.current).toStrictEqual({ x1: -4, x2: 4, y1: y - 4, y2: y + 4 });
@@ -1602,7 +1636,7 @@ describe('attachDataNavigator()', () => {
       expect(tooltipCallback).toHaveBeenCalledWith(
         expect.objectContaining({ _el: container }),
         expect.objectContaining({ clientX: 0, clientY: 56 }),
-        undefined,
+        expect.objectContaining({ bounds: { x1: -4, x2: 4, y1: 52, y2: 60 } }),
         expect.anything()
       );
     });

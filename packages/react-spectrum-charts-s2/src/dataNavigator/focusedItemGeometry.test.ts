@@ -11,9 +11,11 @@
  */
 import { View } from 'vega';
 
+import { DEFAULT_TRANSFORMED_TIME_DIMENSION } from '@spectrum-charts/core-s2/constants';
+
 import { getFocusedItemBounds, getFocusedItemClientPosition } from './focusedItemGeometry.js';
 
-const datum = { datetime: 1000, value: 42 };
+const datum = { datetime: 1000, [DEFAULT_TRANSFORMED_TIME_DIMENSION]: 1000, value: 42 };
 const fields = { dimension: 'datetime', metric: 'value', scaleType: 'time' };
 
 const mockView = (xScaleName: string): View => {
@@ -32,6 +34,20 @@ const mockView = (xScaleName: string): View => {
 };
 
 describe('getFocusedItemBounds()', () => {
+  test('projects sub-second timestamps from the renderer transformed dimension', () => {
+    expect(getFocusedItemBounds(mockView('xTime'), { ...datum, datetime: 1500 }, fields)).toStrictEqual({
+      x1: 96, x2: 104, y1: 80, y2: 88,
+    });
+  });
+
+  test('projects forecast-only rows using the effective plotting metric', () => {
+    expect(getFocusedItemBounds(
+      mockView('xTime'),
+      { ...datum, value: null, salesTrend_effectiveValue: 42 },
+      { ...fields, plottingMetric: 'salesTrend_effectiveValue' }
+    )).toStrictEqual({ x1: 96, x2: 104, y1: 80, y2: 88 });
+  });
+
   test('centers a small box on the scaled point using the xTime/yLinear scale names', () => {
     const bounds = getFocusedItemBounds(mockView('xTime'), datum, fields);
     // x = 1000/10 = 100, y = 42*2 = 84

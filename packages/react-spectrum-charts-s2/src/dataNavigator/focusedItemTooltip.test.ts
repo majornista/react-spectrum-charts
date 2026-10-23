@@ -10,6 +10,7 @@
  * governing permissions and limitations under the License.
  */
 import { View } from 'vega';
+import { Handler } from 'vega-tooltip';
 
 import { MARK_ID } from '@spectrum-charts/core-s2/constants';
 
@@ -19,6 +20,7 @@ import {
   findFocusedLineSceneItem,
   hideFocusedItemTooltip,
   showFocusedItemTooltip,
+  showFocusedItemTooltipAtPosition,
 } from './focusedItemTooltip.js';
 
 const MARK_NAME = 'bar0';
@@ -43,6 +45,34 @@ const mockView = (ringItems: object[] = [], origin: [number, number] = [0, 0]) =
 beforeEach(() => {
   container = document.createElement('div');
   jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0 } as DOMRect);
+});
+
+describe('showFocusedItemTooltipAtPosition()', () => {
+  test.each(['right', 'bottom'] as const)('honors mark anchoring with %s placement', (placement) => {
+    const handler = new Handler({
+      id: 'line-focus-tooltip',
+      anchor: 'mark',
+      position: [placement],
+      offsetX: 6,
+      offsetY: 6,
+      disableDefaultStyle: true,
+    });
+    const view = mockView([], [5, 7]);
+    (view.tooltip as jest.Mock).mockReturnValue(handler.call);
+    jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 100 } as DOMRect);
+    try {
+      showFocusedItemTooltipAtPosition(
+        container, view, { clientX: 205, clientY: 191 }, { value: 42 },
+        { x1: 96, x2: 104, y1: 80, y2: 88 }
+      );
+      const tooltip = document.getElementById('line-focus-tooltip') as HTMLElement;
+      expect(tooltip.classList.contains('visible')).toBe(true);
+      expect(tooltip.style.left).toBe(placement === 'right' ? '215px' : '205px');
+      expect(tooltip.style.top).toBe(placement === 'right' ? '191px' : '201px');
+    } finally {
+      document.getElementById('line-focus-tooltip')?.remove();
+    }
+  });
 });
 
 describe('showFocusedItemTooltip()', () => {

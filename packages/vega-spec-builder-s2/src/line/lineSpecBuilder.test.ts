@@ -1569,7 +1569,7 @@ describe('lineSpecBuilder', () => {
         }
       });
 
-      test('keeps multiple Lines indexes and inspect filters independent in a running Vega view', async () => {
+      test('keeps inspect filters independent while only the first Line receives navigation indexes', async () => {
         Object.entries(getExpressionFunctions()).forEach(([name, implementation]) => {
           expressionFunction(name, implementation);
         });
@@ -1586,7 +1586,7 @@ describe('lineSpecBuilder', () => {
           animations: false,
           marks: [
             { markType: 'line', color: 'series', chartInspects: [{ excludeDataKeys: ['excluded'] }] },
-            { markType: 'line' },
+            { markType: 'line', chartInspects: [{}] },
           ],
         });
         expect(new Set(spec.data?.map(({ name }) => name)).size).toBe(spec.data?.length);
@@ -1596,7 +1596,7 @@ describe('lineSpecBuilder', () => {
           await view.runAsync();
           const liveRows = view.data(FILTERED_TABLE);
           expect(liveRows.map((row) => row.line0_rscNavIndex)).toEqual([1, 1, 2, 2]);
-          expect(liveRows.map((row) => row.line1_rscNavIndex)).toEqual([1, 2, 3, 4]);
+          expect(liveRows.every((row) => row.line1_rscNavIndex === undefined)).toBe(true);
           expect(view.data('line0_filteredTableForInspect')).toHaveLength(3);
           expect(view.data('line1_filteredTableForInspect')).toHaveLength(4);
           view.signal(INTERACTION_MODALITY, 'keyboard').signal(FOCUSED_ITEM, 'A__rsc__2');

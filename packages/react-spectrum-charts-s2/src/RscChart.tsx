@@ -35,7 +35,7 @@ import {
   FOCUSED_REGION,
 } from '@spectrum-charts/core-s2/constants';
 import { toCamelCase } from '@spectrum-charts/core-s2/utils';
-import { ChartHandle, Datum, Orientation, SimpleData, SymbolSize, getChartConfig } from '@spectrum-charts/vega-spec-builder-s2';
+import { ChartHandle, Datum, Orientation, SimpleData, SymbolSize, getChartConfig, getEffectiveMetricField } from '@spectrum-charts/vega-spec-builder-s2';
 
 import './Chart.css';
 import { VegaChart } from './VegaChart.js';
@@ -57,7 +57,9 @@ import useMarkOnClickDetails from './hooks/useMarkOnClickDetails.js';
 import usePopovers, { PopoverDetail } from './hooks/usePopovers.js';
 import useSpec from './hooks/useSpec.js';
 import useSpecProps from './hooks/useSpecProps.js';
-import { ChartChildElement, RscChartProps } from './types/index.js';
+import { childrenToOptions } from './rscToSbAdapter/childrenAdapter.js';
+import { getLineOptions } from './rscToSbAdapter/lineAdapter.js';
+import { ChartChildElement, LineProps, RscChartProps } from './types/index.js';
 import { clearHoverSignals, sanitizeMarkChildren, sanitizeRscChartChildren, setSelectedSignals, shouldClearHoverSignalsOnClose } from './utils/index.js';
 
 /** The `title` prop of the Axis child at the given `position`, if one exists. */
@@ -236,6 +238,11 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   const navIsTimeDimension = navChartType === 'line' ? navScaleType === 'time' : undefined;
   const navDimension = navFields?.dimension ?? (navChartType === 'line' ? DEFAULT_TIME_DIMENSION : DEFAULT_CATEGORICAL_DIMENSION);
   const navMetric = navFields?.metric ?? DEFAULT_METRIC;
+  const navPlottingMetric = useMemo(() => {
+    if (navChartType !== 'line' || !navChild || !markName) return undefined;
+    const { alternateSegmentKey, forecasts = [] } = getLineOptions(navChild.props as LineProps, childrenToOptions);
+    return getEffectiveMetricField({ alternateSegmentKey, forecasts, metric: navMetric, name: markName });
+  }, [navChartType, navChild, markName, navMetric]);
 
   // Axis/legend titles keyed by the field they represent, so a focused bar's accessible name and
   // (for bars without a ChartInspect) its focus tooltip read as the chart's own titles rather than
@@ -408,6 +415,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             orientation={navOrientation}
             isTimeDimension={navIsTimeDimension}
             scaleType={navScaleType}
+            plottingMetric={navPlottingMetric}
             fieldLabels={fieldLabels}
             metricTitleBySeries={navMetricTitleBySeries}
             hasChartInspect={hasChartInspect}

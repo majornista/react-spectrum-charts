@@ -110,6 +110,8 @@ export interface AttachDataNavigatorOptions {
   locale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
+  /** Line-only: rendered metric field used for projected bounds, separate from accessible labels. */
+  plottingMetric?: string;
   /** Line-only: the metric scale name and whether it has primary/secondary scales. */
   metricAxis?: string;
   dualMetricAxis?: boolean;
@@ -254,7 +256,9 @@ const lineNavStrategy: ChartNavStrategy = {
     // A Line point has no persistent rendered scene item to anchor a ring-based tooltip to — position it via scale projection instead.
     const position =
       row && context.metric ? getFocusedItemClientPosition(view, container, row, context) : undefined;
-    if (position) showFocusedItemTooltipAtPosition(container, view, position, value);
+    if (position && row) {
+      showFocusedItemTooltipAtPosition(container, view, position, value, getFocusedItemBounds(view, row, context));
+    }
   },
   canOpenDivisionPopover: false,
 };
@@ -291,7 +295,7 @@ const resolveContentFocusBounds = (
   seriesField: string | undefined,
   metric: string | undefined,
   scaleType: string | undefined,
-  lineFields: Pick<StrategyContext, 'metricAxis' | 'dualMetricAxis' | 'seriesFields'>
+  lineFields: Pick<StrategyContext, 'metricAxis' | 'dualMetricAxis' | 'seriesFields' | 'plottingMetric'>
 ): Bounds | undefined => {
   if (node.dimensionLevel === 1) return undefined;
   const strategy = chartNavStrategies[chartType];
@@ -388,7 +392,7 @@ const buildLeafTooltipValue = (
 };
 
 /** Chart context shared by the focus-tooltip and hover-parity-guard functions below. */
-interface FocusTooltipContext extends Pick<StrategyContext, 'metricAxis' | 'dualMetricAxis' | 'seriesFields'> {
+interface FocusTooltipContext extends Pick<StrategyContext, 'metricAxis' | 'dualMetricAxis' | 'seriesFields' | 'plottingMetric'> {
   chartType: NavigableChartType;
   markName: string;
   dimension: string;
@@ -417,9 +421,9 @@ const showTooltipForFocusedNode = (
       ...context,
       markName,
       dimension,
-      color: series.field,
-      metric,
-      scaleType,
+          color: series.field,
+          metric,
+          scaleType,
     });
   } else if (signals.dimension != null) {
     // Division (whole stack): empty unless a dimensionArea-targeted ChartInspect exists, matching real hover.
@@ -522,6 +526,7 @@ export const attachDataNavigator = ({
   colorOverride,
   locale,
   metric,
+  plottingMetric,
   metricAxis,
   dualMetricAxis,
   order,
@@ -570,6 +575,7 @@ export const attachDataNavigator = ({
   const lineSeriesField = seriesFields.length > 1 ? SERIES_ID : color;
   const seriesField = chartType === 'line' ? lineSeriesField : barSeriesField;
   const lineFields = {
+    plottingMetric,
     metricAxis,
     dualMetricAxis,
     seriesFields: chartType === 'line' ? seriesFields : undefined,
