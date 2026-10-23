@@ -231,10 +231,9 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   // Line has no orientation prop — always defaults to vertical, so this only ever swaps arrow keys for Bar.
   const navOrientation: Orientation = navFields?.orientation === 'horizontal' ? 'horizontal' : 'vertical';
   const markName = navFields?.name ?? (navChartType ? `${navChartType}0` : undefined);
-  // Line's dimension defaults to the time dimension unless it's been explicitly given a discrete scaleType.
   const navScaleType = navChartType === 'line' ? navFields?.scaleType ?? 'time' : undefined;
   const navIsTimeDimension = navChartType === 'line' ? navScaleType === 'time' : undefined;
-  const navDimension = navFields?.dimension ?? (navIsTimeDimension ? DEFAULT_TIME_DIMENSION : DEFAULT_CATEGORICAL_DIMENSION);
+  const navDimension = navFields?.dimension ?? (navChartType === 'line' ? DEFAULT_TIME_DIMENSION : DEFAULT_CATEGORICAL_DIMENSION);
   const navMetric = navFields?.metric ?? DEFAULT_METRIC;
 
   // Axis/legend titles keyed by the field they represent, so a focused bar's accessible name and
