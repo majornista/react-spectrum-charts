@@ -13,7 +13,7 @@ import { RefObject } from 'react';
 
 import { Item, Scene, SceneGroup, SceneItem, ScenegraphEvent, View } from 'vega';
 
-import { COMPONENT_NAME, DIMENSION_FIELD, FILTERED_TABLE, GROUP_DATA, SERIES_ID } from '@spectrum-charts/core-s2/constants';
+import { COMPONENT_NAME, DIMENSION_FIELD, DIMENSION_HOVER_AREA, FILTERED_TABLE, GROUP_DATA, SERIES_ID } from '@spectrum-charts/core-s2/constants';
 import { Datum, MarkBounds } from '@spectrum-charts/vega-spec-builder-s2';
 
 import type { AxisLabelOnClickDetail } from '../hooks/useAxisLabelOnClickDetails.js';
@@ -75,6 +75,8 @@ const handleMarkClick = (
   if (!chartView.current) return;
 
   item = getGroupOrAreaMarkItemFromItem(item);
+  const markName = isItemSceneItem(item) ? (item.mark as unknown as { name?: string }).name : undefined;
+  if (markName?.endsWith(`_${DIMENSION_HOVER_AREA}`)) return;
   // clicking the button will trigger a new view since it will cause a rerender
   // this means we don't need to set the signal value since it would just be cleared on rerender
   // instead, the rerender will set the value of the signal to the selectedData

@@ -64,7 +64,7 @@ describe('getStackFocusRing()', () => {
     expect(ring).toHaveProperty('name', 'bar0_stackFocusRing');
     expect(ring.from).toEqual({ data: 'bar0_stacks' });
     expect(ring.encode?.update?.opacity).toEqual([
-      { test: `${FOCUSED_DIMENSION} === ("" + datum.${dimension})`, value: 1 },
+      { test: `!isValid(${defaultBarOptions.name}_pointerHovered) && ${FOCUSED_DIMENSION} === ("" + datum.${dimension})`, value: 1 },
       { value: 0 },
     ]);
   });
@@ -99,7 +99,7 @@ describe('getDodgedGroupFocusRing()', () => {
     expect(ring).toHaveProperty('name', 'bar0_stackFocusRing');
     expect(ring.from).toEqual({ data: 'bar0_groups' });
     expect(ring.encode?.update?.opacity).toEqual([
-      { test: `${FOCUSED_DIMENSION} === ("" + datum.${dimension})`, value: 1 },
+      { test: `!isValid(${defaultBarOptions.name}_pointerHovered) && ${FOCUSED_DIMENSION} === ("" + datum.${dimension})`, value: 1 },
       { value: 0 },
     ]);
   });

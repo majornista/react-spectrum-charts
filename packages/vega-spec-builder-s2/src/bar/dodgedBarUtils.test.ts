@@ -210,6 +210,12 @@ describe('dodgedBarUtils', () => {
     test('default options,', () => {
       expect(getDodgedMarks(defaultDodgedOptions)).toStrictEqual([defaultDodgedMark]);
     });
+    test('accessible navigation makes bars pointer targets without other interactions', () => {
+      const marks = getDodgedMarks({ ...defaultDodgedOptions, accessibleNavigation: true });
+      const group = marks.find((mark) => mark.type === 'group') as GroupMark;
+      expect(group.marks?.find((mark) => mark.name === 'bar0')).toHaveProperty('interactive', true);
+      expect(group.marks?.find((mark) => mark.name === 'bar0_background')).toHaveProperty('interactive', false);
+    });
     test('with annotation', () => {
       const marks = getDodgedMarks({
         ...defaultDodgedOptions,

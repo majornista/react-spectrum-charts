@@ -267,6 +267,21 @@ describe('getOnMarkClickCallback() mark click with markHasPopover', () => {
       foo: 1,
     });
   });
+
+  test('an item popover ignores the dimension hover area above a bar stack', () => {
+    const selectedData = { current: null as unknown };
+    const callback = getOnMarkClickCallback({
+      ...defaultMarkClickArgs,
+      markHasPopover: true,
+      selectedData: selectedData as GetOnMarkClickCallbackArgs['selectedData'],
+    });
+    const dimensionAreaItem = {
+      ...markItem,
+      mark: { name: 'bar0_dimensionHoverArea', marktype: 'rect', group: { x: 0, y: 0 } },
+    } as unknown as Item;
+    callback(fakeClickEvent, dimensionAreaItem);
+    expect(selectedData.current).toBeNull();
+  });
 });
 
 describe('getOnChartMarkContextMenuCallback()', () => {

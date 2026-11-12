@@ -63,7 +63,7 @@ export const getDodgedMarks = (options: BarSpecOptions): (GroupMark | RectMark)[
           name,
           from: { data: `${name}_facet` },
           type: 'rect',
-          interactive: isInteractive(options),
+          interactive: isInteractive(options) || Boolean(options.accessibleNavigation),
           encode: {
             enter: {
               ...getBaseBarEnterEncodings(options),

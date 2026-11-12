@@ -268,6 +268,15 @@ export const addSignals = produce<Signal[], [BarSpecOptions]>((signals, options)
 
   if (options.accessibleNavigation) {
     addFocusSignals(signals);
+    signals.push({
+      name: `${name}_pointerHovered`,
+      value: null,
+      on: [
+        { events: `@${name}:mouseover`, update: 'datum' },
+        { events: `@${name}:mousemove`, update: 'datum' },
+        { events: `@${name}:mouseout`, update: 'null' },
+      ],
+    });
   }
 
   if (isDualMetricAxis(options)) {

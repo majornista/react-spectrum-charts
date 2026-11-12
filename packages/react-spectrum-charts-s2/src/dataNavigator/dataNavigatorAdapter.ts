@@ -877,6 +877,7 @@ export const attachDataNavigator = ({
       event.preventDefault();
       const next = input.move(current, direction);
       if (next) {
+        if (chartType === 'bar' && markName) getView()?.signal(`${markName}_pointerHovered`, null);
         navigate(next);
         return;
       }
