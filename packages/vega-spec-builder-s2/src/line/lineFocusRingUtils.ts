@@ -13,6 +13,9 @@ import { LineMark, NumericValueRef, ProductionRule, SymbolMark } from 'vega';
 
 import {
   BACKGROUND_COLOR,
+  CHART_SIZE_HOVER_STROKE_WIDTH,
+  CHART_SIZE_POINT_SIZE,
+  CHART_SIZE_STROKE_WIDTH,
   FILTERED_TABLE,
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
@@ -28,13 +31,12 @@ import { getFocusedGroupOrItemMatchExpr } from '../marks/focusMatchUtils.js';
 import { getXProductionRule } from '../marks/markUtils.js';
 import { LineSpecOptions } from '../types/index.js';
 import { getLineYEncoding } from './lineEncodingUtils.js';
+import { getLineStrokeWidth } from './lineMarkUtils.js';
 import { LineMarkOptions, getLineSeriesIdExpr } from './lineUtils.js';
 
 export { getChartFocusRing } from '../marks/chartFocusRingUtils.js';
 
-const LINE_FOCUS_RING_OUTER_STROKE_WIDTH = 12;
-const LINE_FOCUS_RING_GAP_STROKE_WIDTH = 8;
-const POINT_FOCUS_RING_SIZE = 500;
+const FOCUS_RING_GAP = 2;
 
 const getLineFocusRingStrokeWidth = (
   options: LineSpecOptions,
@@ -43,9 +45,18 @@ const getLineFocusRingStrokeWidth = (
   // Static encodings use the implicit single-line division.
   const seriesId = getLineSeriesIdExpr(options);
   const isFocused = seriesId ? `${FOCUSED_DIMENSION} === ${seriesId}` : `${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}'`;
+  const focusedTest = `${INTERACTION_MODALITY} === 'keyboard' && (${isFocused})`;
+  const strokeWidth = getLineStrokeWidth(options);
+  const strokeWidthRules = Array.isArray(strokeWidth) ? strokeWidth : [strokeWidth];
   // Pointer hover suppresses keyboard halos until keyboard modality is restored.
   return [
-    { test: `${INTERACTION_MODALITY} === 'keyboard' && (${isFocused})`, value: width },
+    ...strokeWidthRules.map((rule) => {
+      const ruleWidth = 'signal' in rule ? rule.signal : 'value' in rule ? rule.value : CHART_SIZE_STROKE_WIDTH;
+      return {
+        test: 'test' in rule && rule.test ? `${focusedTest} && (${rule.test})` : focusedTest,
+        signal: `(${ruleWidth}) + ${width}`,
+      };
+    }),
     { value: 0 },
   ];
 };
@@ -69,7 +80,7 @@ export const getLineFocusRingOuter = (options: LineSpecOptions, dataSource: stri
       update: {
         x: getXProductionRule(scaleType, dimension),
         ...(interpolate ? { interpolate: { value: interpolate } } : {}),
-        strokeWidth: getLineFocusRingStrokeWidth(options, LINE_FOCUS_RING_OUTER_STROKE_WIDTH),
+        strokeWidth: getLineFocusRingStrokeWidth(options, 2 * (FOCUS_RING_GAP + FOCUS_RING_STROKE_WIDTH)),
       },
     },
   };
@@ -94,7 +105,7 @@ export const getLineFocusRingGap = (options: LineSpecOptions, dataSource: string
       update: {
         x: getXProductionRule(scaleType, dimension),
         ...(interpolate ? { interpolate: { value: interpolate } } : {}),
-        strokeWidth: getLineFocusRingStrokeWidth(options, LINE_FOCUS_RING_GAP_STROKE_WIDTH),
+        strokeWidth: getLineFocusRingStrokeWidth(options, 2 * FOCUS_RING_GAP),
       },
     },
   };
@@ -118,7 +129,7 @@ export const getLineGroupZIndexEncoding = (
 
 /** A ring drawn around the focused point, on top of (and independent from) the reused hover-highlight point. */
 export const getPointFocusRing = (options: LineSpecOptions): SymbolMark => {
-  const { colorScheme, dimension, metric, name, scaleType } = options;
+  const { colorScheme, dimension, metric, name, pointSize, scaleType } = options;
   const seriesId = getLineSeriesIdExpr(options);
   const focusedItemId =
     seriesId
@@ -132,13 +143,15 @@ export const getPointFocusRing = (options: LineSpecOptions): SymbolMark => {
     aria: false,
     encode: {
       enter: {
-        size: { value: POINT_FOCUS_RING_SIZE },
         fill: { value: 'transparent' },
         strokeWidth: { value: FOCUS_RING_STROKE_WIDTH },
         stroke: { value: getS2ColorValue('blue-800', colorScheme) },
         y: getLineYEncoding(options, metric),
       },
       update: {
+        size: {
+          signal: `pow(sqrt(${pointSize ?? CHART_SIZE_POINT_SIZE}) + ${CHART_SIZE_HOVER_STROKE_WIDTH} + ${2 * FOCUS_RING_GAP + FOCUS_RING_STROKE_WIDTH}, 2)`,
+        },
         x: getXProductionRule(scaleType, dimension),
         // Same reasoning as getLineFocusRingStrokeWidth: hide the ring while a real hover elsewhere
         // has dimmed this point, rather than showing it at full opacity over a dimmed target.

@@ -11,6 +11,9 @@
  */
 import {
   BACKGROUND_COLOR,
+  CHART_SIZE_STROKE_WIDTH,
+  CHART_SIZE_HOVER_STROKE_WIDTH,
+  CHART_SIZE_POINT_SIZE,
   FILTERED_TABLE,
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
@@ -38,13 +41,26 @@ import {
 const singleLineOptions = { ...defaultLineOptions, color: { value: 'categorical-100' } };
 
 describe('getLineFocusRingOuter()', () => {
+  test('keeps a 2px gap and ring around the responsive line width', () => {
+    const options = defaultLineOptions;
+    const test = `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ('' + (datum.series)))`;
+    expect(getLineFocusRingOuter(options, 'line0_facet')).toHaveProperty('encode.update.strokeWidth', [
+      { test, signal: `(${CHART_SIZE_STROKE_WIDTH}) + 8` },
+      { value: 0 },
+    ]);
+    expect(getLineFocusRingGap(options, 'line0_facet')).toHaveProperty('encode.update.strokeWidth', [
+      { test, signal: `(${CHART_SIZE_STROKE_WIDTH}) + 4` },
+      { value: 0 },
+    ]);
+  });
+
   test('sources the ring from the provided data and keys strokeWidth on the focused dimension', () => {
     const ring = getLineFocusRingOuter(defaultLineOptions, 'line0_facet');
     expect(ring).toHaveProperty('name', 'line0_focusRingOuter');
     expect(ring.from).toEqual({ data: 'line0_facet' });
     expect(ring.interactive).toBe(false);
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ('' + (datum.series)))`, value: 12 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ('' + (datum.series)))`, signal: `(${CHART_SIZE_STROKE_WIDTH}) + 8` },
       { value: 0 },
     ]);
   });
@@ -54,7 +70,7 @@ describe('getLineFocusRingOuter()', () => {
   test('keys a single-series (static color) line on the fixed single-line division id, not a color field', () => {
     const ring = getLineFocusRingOuter(singleLineOptions, 'line0_facet');
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}')`, value: 12 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}')`, signal: `(${CHART_SIZE_STROKE_WIDTH}) + 8` },
       { value: 0 },
     ]);
   });
@@ -67,7 +83,7 @@ describe('getLineFocusRingGap()', () => {
     expect(ring.from).toEqual({ data: 'line0_facet' });
     expect(ring.encode?.enter?.stroke).toEqual({ signal: BACKGROUND_COLOR });
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ('' + (datum.series)))`, value: 8 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ('' + (datum.series)))`, signal: `(${CHART_SIZE_STROKE_WIDTH}) + 4` },
       { value: 0 },
     ]);
   });
@@ -75,7 +91,7 @@ describe('getLineFocusRingGap()', () => {
   test('keys a single-series (static color) line on the fixed single-line division id, not a color field', () => {
     const ring = getLineFocusRingGap(singleLineOptions, 'line0_facet');
     expect(ring.encode?.update?.strokeWidth).toEqual([
-      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}')`, value: 8 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === '${SINGLE_LINE_NODE_ID}')`, signal: `(${CHART_SIZE_STROKE_WIDTH}) + 4` },
       { value: 0 },
     ]);
   });
@@ -98,6 +114,13 @@ describe('getLineGroupZIndexEncoding()', () => {
 });
 
 describe('getPointFocusRing()', () => {
+  test.each([undefined, 36, 144])('sizes the ring around point area %s with a fixed gap', (pointSize) => {
+    expect(getPointFocusRing({ ...defaultLineOptions, pointSize })).toHaveProperty('encode.update.size', {
+      signal: `pow(sqrt(${pointSize ?? CHART_SIZE_POINT_SIZE}) + ${CHART_SIZE_HOVER_STROKE_WIDTH} + 6, 2)`,
+    });
+    expect(getPointFocusRing(defaultLineOptions)).toHaveProperty('encode.enter.strokeWidth', { value: 2 });
+  });
+
   test.each(['lineType', 'opacity'] as const)('includes the field-backed %s in focus identity', (facet) => {
     const options = { ...defaultLineOptions, [facet]: 'period' };
     const seriesId = 'datum.series + " | " + datum.period';
@@ -109,11 +132,11 @@ describe('getPointFocusRing()', () => {
       { value: 0 },
     ]);
     expect(getLineFocusRingOuter(options, 'line0_facet')).toHaveProperty('encode.update.strokeWidth', [
-      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ${seriesId})`, value: 12 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ${seriesId})`, signal: `(${CHART_SIZE_STROKE_WIDTH}) + 8` },
       { value: 0 },
     ]);
     expect(getLineFocusRingGap(options, 'line0_facet')).toHaveProperty('encode.update.strokeWidth', [
-      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ${seriesId})`, value: 8 },
+      { test: `${INTERACTION_MODALITY} === 'keyboard' && (${FOCUSED_DIMENSION} === ${seriesId})`, signal: `(${CHART_SIZE_STROKE_WIDTH}) + 4` },
       { value: 0 },
     ]);
     expect(getLineGroupZIndexEncoding(options)).toEqual([

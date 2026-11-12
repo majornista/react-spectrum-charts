@@ -463,6 +463,7 @@ describe('Chart spec builder', () => {
       items?: SceneNode[];
       opacity?: number;
       strokeWidth?: number;
+      size?: number;
       y?: number;
     };
     const getSceneItems = (view: View, name: string): SceneNode[] => {
@@ -480,6 +481,42 @@ describe('Chart spec builder', () => {
       });
       expressionFunction('rscContainerWidth', () => 400);
       expressionFunction('getLabelWidth', () => 40);
+    });
+
+    test.each([undefined, 36, 144])('keeps 2px point and line focus gaps for point size %s', async (pointSize) => {
+      const rows = [{ datetime: 0, value: 10, series: 'A' }, { datetime: 1, value: 20, series: 'A' }];
+      const spec = buildSpec({
+        data: rows,
+        accessibleNavigation: true,
+        animations: false,
+        marks: [{ markType: 'line', color: 'series', pointSize, chartInspects: [{}] }],
+      });
+      const view = new View(parse(spec), { renderer: 'none' });
+      try {
+        view.width(400).height(300).data(TABLE, rows);
+        await view.runAsync();
+        for (const strokeWidth of [1, 4, 10]) {
+          view.signal(CHART_SIZE_STROKE_WIDTH, strokeWidth).signal(CHART_SIZE_HOVER_STROKE_WIDTH, strokeWidth + 0.5);
+          view.signal(INTERACTION_MODALITY, 'keyboard').signal(FOCUSED_DIMENSION, 'A');
+          await view.runAsync();
+          const [line] = getSceneItems(view, 'line0');
+          const [gap] = getSceneItems(view, 'line0_focusRingGap');
+          const [outer] = getSceneItems(view, 'line0_focusRingOuter');
+          expect((Number(gap.strokeWidth) - Number(line.strokeWidth)) / 2).toBeCloseTo(2);
+          expect((Number(outer.strokeWidth) - Number(gap.strokeWidth)) / 2).toBeCloseTo(2);
+
+          view.signal(FOCUSED_DIMENSION, null).signal(FOCUSED_ITEM, 'A__rsc__1');
+          await view.runAsync();
+          const [ring] = getSceneItems(view, 'line0_pointFocusRing').filter(({ opacity }) => opacity === 1);
+          const [point] = getSceneItems(view, 'line0_point_highlight');
+          expect(ring.strokeWidth).toBe(2);
+          expect((Math.sqrt(Number(ring.size)) - Number(ring.strokeWidth) - Math.sqrt(Number(point.size)) - Number(point.strokeWidth)) / 2).toBeCloseTo(2);
+
+          view.signal(FOCUSED_ITEM, null);
+        }
+      } finally {
+        view.finalize();
+      }
     });
 
     test('only the first unfaceted line responds to point and division focus', async () => {
@@ -509,7 +546,7 @@ describe('Chart spec builder', () => {
 
         view.signal(FOCUSED_ITEM, null).signal(FOCUSED_DIMENSION, SINGLE_LINE_NODE_ID);
         await view.runAsync();
-        expect(getSceneItems(view, 'line0_focusRingOuter').every(({ strokeWidth }) => strokeWidth === 12)).toBe(true);
+        expect(getSceneItems(view, 'line0_focusRingOuter').every(({ strokeWidth }) => strokeWidth === view.signal(CHART_SIZE_STROKE_WIDTH) + 8)).toBe(true);
         expect(getSceneItems(view, 'line0_focusRingOuter')).not.toHaveLength(0);
         expect(getSceneItems(view, 'line1_focusRingOuter')).toHaveLength(0);
         expect(view.data('line1_highlightedData')).toHaveLength(0);
@@ -554,7 +591,7 @@ describe('Chart spec builder', () => {
           await view.runAsync();
           expect(getSceneItems(view, 'bar0_focusRing').filter(({ opacity }) => opacity === 1)).toHaveLength(1);
         } else {
-          expect(getSceneItems(view, 'line0_focusRingOuter').some(({ strokeWidth }) => strokeWidth === 12)).toBe(true);
+          expect(getSceneItems(view, 'line0_focusRingOuter').some(({ strokeWidth }) => strokeWidth === view.signal(CHART_SIZE_HOVER_STROKE_WIDTH) + 8)).toBe(true);
         }
       } finally {
         view.finalize();
