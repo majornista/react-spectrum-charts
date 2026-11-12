@@ -39,6 +39,7 @@ export interface NavigatorProps {
   colorOverride?: string;
   /** Locale used for accessible color names. */
   locale?: string;
+  numberLocale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
   /** Line-only: rendered metric field used for projected bounds, separate from accessible labels. */
@@ -95,6 +96,7 @@ export const Navigator = ({
   type,
   colorOverride,
   locale,
+  numberLocale,
   metric,
   plottingMetric,
   metricAxis,
@@ -137,6 +139,7 @@ export const Navigator = ({
         type,
         colorOverride,
         locale,
+        numberLocale,
         metric,
         plottingMetric,
         metricAxis,
@@ -161,18 +164,31 @@ export const Navigator = ({
         hasChartPopover,
       });
     let raf: number | undefined;
+    let observedView: View | undefined;
     let retryCount = 0;
     const attachAndRetry = () => {
       attach();
-      if (!getView() && retryCount < 3) {
+      const view = getView();
+      if (view && !observedView) {
+        try {
+          view.addSignalListener('hiddenSeries', onHiddenSeriesChange);
+          observedView = view;
+        } catch {}
+      }
+      if (!view && retryCount < 3) {
         retryCount += 1;
         raf = requestAnimationFrame(attachAndRetry);
       }
+    };
+    const onHiddenSeriesChange = () => {
+      if (raf !== undefined) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(attachAndRetry);
     };
     // Attach promptly so the entry control is available while Vega finishes exposing its view.
     raf = requestAnimationFrame(attachAndRetry);
     return () => {
       if (raf !== undefined) cancelAnimationFrame(raf);
+      observedView?.removeSignalListener('hiddenSeries', onHiddenSeriesChange);
     };
   }, [
     chartType,
@@ -185,6 +201,7 @@ export const Navigator = ({
     type,
     colorOverride,
     locale,
+    numberLocale,
     metric,
     plottingMetric,
     metricAxis,

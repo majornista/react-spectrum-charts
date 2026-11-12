@@ -256,6 +256,7 @@ describe('buildChartDescription()', () => {
     const label = buildChartDescription(data, 'datetime');
     expect(label).toContain('Line chart');
     expect(label).toContain('3 points');
+    expect(label).toContain('Press Enter to drill into the line, then Enter or the right arrow key');
   });
 
   test('uses the singular form for a single point', () => {
@@ -268,6 +269,7 @@ describe('buildChartDescription()', () => {
     expect(label).toContain('Multi-series line chart');
     expect(label).toContain('stacked by series');
     expect(label).toContain('2 lines');
+    expect(label).toContain('Press Enter to drill into the first line; use the up and down arrow keys');
   });
 });
 

@@ -27,6 +27,29 @@ describe('LinePointAnnotation', () => {
 });
 
 describe('Line', () => {
+  test('uses object-form time and number locales for keyboard navigation', async () => {
+    const datetime = Date.UTC(2024, 2, 15);
+    render(
+      <Chart data={[{ datetime, value: 1234.5 }, { datetime: datetime + 86400000, value: 2345.6 }]}
+        locale={{ time: 'de-DE', number: 'en-US' }} accessibleNavigation animations={false} width={400} height={300}>
+        <Line />
+      </Chart>
+    );
+    const svg = await findChart();
+    const container = svg.closest('.rsc-container') as HTMLElement;
+    await waitFor(() => expect(container.querySelector('.dn-entry-button')).toBeTruthy());
+    fireEvent.click(container.querySelector('.dn-entry-button') as HTMLElement);
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Enter', code: 'Enter' });
+    fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Enter', code: 'Enter' });
+    const formattedDate = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(datetime));
+    expect(document.activeElement?.querySelector('.dn-node-text')?.getAttribute('aria-label')).toContain(formattedDate);
+    await waitFor(() => {
+      const tooltip = document.getElementById('vg-tooltip-element');
+      expect(tooltip?.textContent).toContain(formattedDate);
+      expect(tooltip?.textContent).toContain('1,234.5');
+    });
+  });
+
   test('anchors forecast navigation to the rendered time and effective metric without changing callback data', async () => {
     let view: View | undefined;
     const onClick = jest.fn();

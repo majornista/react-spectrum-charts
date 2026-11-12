@@ -28,8 +28,12 @@ export const combineNames = (parentName: string | null, childName: string | null
  * @returns The camel case string
  */
 export function toCamelCase(str: string) {
-  const words = str.match(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+\d*|\d+/g);
-  if (words) {
+  const words = Array.from(str.matchAll(/[A-Z]+(?![a-z])|[A-Z]?[a-z]+\d*|\d+/g)).flatMap((match) => {
+    const word = match[0];
+    const nextCharacter = str.charAt(match.index + word.length);
+    return /^[A-Z]+$/.test(word) && /[\d_]/.test(nextCharacter) ? word.split('') : [word];
+  });
+  if (words.length) {
     return words
       .map((word, i) => {
         if (i === 0) return word.toLowerCase();

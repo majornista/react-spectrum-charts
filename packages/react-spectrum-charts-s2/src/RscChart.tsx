@@ -236,6 +236,11 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   const markName = navChartType ? toCamelCase(navFields?.name || `${navChartType}0`) : undefined;
   const navScaleType = navChartType === 'line' ? navFields?.scaleType ?? 'time' : undefined;
   const navIsTimeDimension = navChartType === 'line' ? navScaleType === 'time' : undefined;
+  const navLocale = typeof locale === 'string' ? locale
+    : typeof locale?.time === 'string' ? locale.time
+    : typeof locale?.number === 'string' ? locale.number : undefined;
+  const navNumberLocale = typeof locale === 'string' ? locale
+    : typeof locale?.number === 'string' ? locale.number : 'en-US';
   const navDimension = navFields?.dimension ?? (navChartType === 'line' ? DEFAULT_TIME_DIMENSION : DEFAULT_CATEGORICAL_DIMENSION);
   const navMetric = navFields?.metric ?? DEFAULT_METRIC;
   const navPlottingMetric = useMemo(() => {
@@ -407,7 +412,8 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             stackFields={navSeries.stackFields}
             type={navFields?.type}
             colorOverride={navColorOverride}
-            locale={typeof locale === 'string' ? locale : undefined}
+            locale={navLocale}
+            numberLocale={navNumberLocale}
             metric={navMetric}
             metricAxis={navFields?.metricAxis}
             dualMetricAxis={navDualMetricAxis}

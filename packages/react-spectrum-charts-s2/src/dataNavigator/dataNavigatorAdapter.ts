@@ -52,6 +52,7 @@ import {
   buildChartStructure,
   getNodeIdForDatum,
 } from './buildChartStructure.js';
+import { formatDateValue } from './buildLineStructure.js';
 import { getNodeRegion, stripRegionPrefix } from './composeRegions.js';
 import './dataNavigator.css';
 import { FocusedItemFields, getFocusedItemBounds, getFocusedItemClientPosition } from './focusedItemGeometry.js';
@@ -108,6 +109,7 @@ export interface AttachDataNavigatorOptions {
   colorOverride?: string;
   /** Locale used for accessible color names. */
   locale?: string;
+  numberLocale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
   /** Line-only: rendered metric field used for projected bounds, separate from accessible labels. */
@@ -394,6 +396,9 @@ const buildLeafTooltipValue = (
 /** Chart context shared by the focus-tooltip and hover-parity-guard functions below. */
 interface FocusTooltipContext extends Pick<StrategyContext, 'metricAxis' | 'dualMetricAxis' | 'seriesFields' | 'plottingMetric'> {
   chartType: NavigableChartType;
+  locale?: string;
+  numberLocale?: string;
+  isTimeDimension?: boolean;
   markName: string;
   dimension: string;
   series: SeriesLookup;
@@ -416,7 +421,17 @@ const showTooltipForFocusedNode = (
     // Leaf: full datum for ChartInspect, otherwise a clean axis-titled subset.
     const row = findFocusedRow(view, node, dimension, series.field, context.seriesFields, chartType === 'line' ? markName : undefined);
     const fields = [dimension, ...series.labelFields, metric];
-    const value = row ? buildLeafTooltipValue(row, markName, hasChartInspect, fieldLabels, fields) : null;
+    let value = row ? buildLeafTooltipValue(row, markName, hasChartInspect, fieldLabels, fields) : null;
+    if (value && chartType === 'line' && !hasChartInspect) {
+      const tooltipLocale = context.locale ?? 'en-US';
+      const numberFormatter = new Intl.NumberFormat(context.numberLocale ?? tooltipLocale);
+      value = Object.fromEntries(Object.entries(value).map(([field, fieldValue]) => {
+        if (context.isTimeDimension && field === (fieldLabels[dimension] ?? dimension)) {
+          return [field, formatDateValue(fieldValue, tooltipLocale)];
+        }
+        return [field, typeof fieldValue === 'number' ? numberFormatter.format(fieldValue) : fieldValue];
+      }));
+    }
     chartNavStrategies[chartType].showLeafTooltip(container, view, row, value, {
       ...context,
       markName,
@@ -446,6 +461,7 @@ const clickToFocusHandlers = new WeakMap<View, ViewEventHandler>();
 
 /** One modality-restore handler per view, so a re-attach replaces rather than stacks the listener. */
 const modalityRestoreHandlers = new WeakMap<View, ViewEventHandler>();
+const pointerExitHandlers = new WeakMap<HTMLElement, EventListener>();
 
 /**
  * Real mouse mouseout unconditionally nulls the shared `${markName}_hoveredItem` signals (see
@@ -525,6 +541,7 @@ export const attachDataNavigator = ({
   type,
   colorOverride,
   locale,
+  numberLocale,
   metric,
   plottingMetric,
   metricAxis,
@@ -548,6 +565,12 @@ export const attachDataNavigator = ({
   onNodeClick,
   hasChartPopover,
 }: AttachDataNavigatorOptions): void => {
+  if (chartType !== 'bar' && chartType !== 'line') return;
+  const previousPointerExit = pointerExitHandlers.get(container);
+  if (previousPointerExit) {
+    container.removeEventListener('mouseleave', previousPointerExit);
+    pointerExitHandlers.delete(container);
+  }
   // Restrict x-axis navigation to labels Vega actually painted, so overlap-hidden ticks are skipped
   // (their focus ring wouldn't render). Read from the live, laid-out scenegraph.
   const initialView = getView();
@@ -568,9 +591,16 @@ export const attachDataNavigator = ({
       dimension,
     }
   );
-  const navData = chartType === 'line' && seriesFields.length > 1
-    ? keyedData.map((row) => ({ ...row, [SERIES_ID]: getSeriesKey(row, seriesFields) }))
+  let hiddenSeries: unknown;
+  try {
+    hiddenSeries = initialView?.signal('hiddenSeries');
+  } catch {}
+  const visibleData = Array.isArray(hiddenSeries)
+    ? keyedData.filter((row) => !hiddenSeries.includes(row[SERIES_ID]))
     : keyedData;
+  const navData = chartType === 'line' && seriesFields.length > 1
+    ? visibleData.map((row) => ({ ...row, [SERIES_ID]: getSeriesKey(row, seriesFields) }))
+    : visibleData;
   const barSeriesField = navData.some((row) => SERIES_ID in row) ? SERIES_ID : color;
   const lineSeriesField = seriesFields.length > 1 ? SERIES_ID : color;
   const seriesField = chartType === 'line' ? lineSeriesField : barSeriesField;
@@ -578,6 +608,9 @@ export const attachDataNavigator = ({
     plottingMetric,
     metricAxis,
     dualMetricAxis,
+    locale,
+    numberLocale,
+    isTimeDimension,
     seriesFields: chartType === 'line' ? seriesFields : undefined,
   };
   const colorLabelFields = color ? [color] : [];
@@ -609,15 +642,17 @@ export const attachDataNavigator = ({
     metricTitleBySeries,
     xAxis: xAxisRegion,
   });
-  if (!built) return;
+  container.querySelectorAll('.dn-wrapper, .dn-exit-position, .dn-exit').forEach((node) => node.remove());
+  container.querySelectorAll('.dn-axis-focus-ring').forEach((node) => node.remove());
+  if (!built || navData.length === 0) {
+    container.querySelectorAll('.dn-entry-button').forEach((node) => node.remove());
+    return;
+  }
   const { structure, entryPoint } = built;
 
   if (!container.id) {
     container.id = `dn-root-${chartId}`;
   }
-
-  container.querySelectorAll('.dn-wrapper, .dn-exit-position, .dn-exit').forEach((node) => node.remove());
-  container.querySelectorAll('.dn-axis-focus-ring').forEach((node) => node.remove());
 
   let current: string | null = null;
   // The persisted node stays in the DOM after focus leaves the widget (so Shift+Tab returns to it), so
@@ -1029,5 +1064,13 @@ export const attachDataNavigator = ({
     };
     view.addEventListener('mouseout', handleMouseOut);
     modalityRestoreHandlers.set(view, handleMouseOut);
+    if (chartType === 'line') {
+      const handlePointerExit = () => {
+        applyInteractionModality(view);
+        view.runAsync().catch(logFocusError);
+      };
+      container.addEventListener('mouseleave', handlePointerExit);
+      pointerExitHandlers.set(container, handlePointerExit);
+    }
   }
 };

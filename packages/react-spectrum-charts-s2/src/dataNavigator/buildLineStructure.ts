@@ -221,7 +221,7 @@ export const buildChartDescription = (
 };
 
 /** Formats a raw dimension value as a readable date/time, falling back to the raw value if it isn't a valid date. */
-const formatDateValue = (value: unknown, locale: string): string => {
+export const formatDateValue = (value: unknown, locale: string): string => {
   const date = new Date(value as string | number);
   if (Number.isNaN(date.getTime())) return String(value);
   const hasTimeComponent = date.getHours() || date.getMinutes() || date.getSeconds();

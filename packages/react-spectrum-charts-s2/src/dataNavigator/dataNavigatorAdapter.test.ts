@@ -22,6 +22,7 @@ import {
   FOCUSED_ITEM,
   FOCUSED_REGION,
   HOVERED_ITEM,
+  INTERACTION_MODALITY,
   LAST_RSC_SERIES_ID,
   MARK_ID,
   NAVIGATION_INDEX_FIELD,
@@ -1416,6 +1417,56 @@ describe('attachDataNavigator()', () => {
     test('renders an entry button for a line chart', () => {
       attachLine();
       expect(entryButton()).toBeTruthy();
+    });
+
+    test('restores keyboard modality only on chart exit without duplicating handlers', () => {
+      attachLine();
+      enterFirstPoint();
+      const focusedItem = signal(FOCUSED_ITEM);
+      signal(INTERACTION_MODALITY, 'pointer');
+      fireEvent.mouseOut(container, { relatedTarget: container });
+      expect(signal(INTERACTION_MODALITY)).toBe('pointer');
+      (view.runAsync as jest.Mock).mockClear();
+      fireEvent.mouseLeave(container, { relatedTarget: document.body });
+      expect(signal(INTERACTION_MODALITY)).toBe('keyboard');
+      expect(signal(FOCUSED_ITEM)).toBe(focusedItem);
+      expect(view.runAsync).toHaveBeenCalledTimes(1);
+    });
+
+    test('skips hidden lines and removes navigation when every line is hidden', () => {
+      const rows = [
+        { datetime: 0, value: 28, series: 'Visible', [SERIES_ID]: 'Visible' },
+        { datetime: 1, value: 43, series: 'Hidden', [SERIES_ID]: 'Hidden' },
+      ];
+      (view.data as jest.Mock).mockReturnValue(rows);
+      signal('hiddenSeries', ['Hidden']);
+      const options = { data: rows, color: 'series', seriesFields: ['series'] };
+      attachLine(options);
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      expect(focused().querySelector('.dn-node-text')?.getAttribute('aria-label')).toContain('Visible');
+      fireEvent.keyDown(focused(), { key: 'ArrowDown', code: 'ArrowDown' });
+      expect(focused().querySelector('.dn-node-text')?.getAttribute('aria-label')).toContain('Visible');
+      signal('hiddenSeries', ['Visible', 'Hidden']);
+      attachLine(options);
+      expect(container.querySelector('.dn-entry-button')).toBeNull();
+    });
+
+    test.each([false, true])('formats plain tooltips without changing ChartInspect data (inspect=%s)', async (hasChartInspect) => {
+      attachLine({ locale: 'de-DE', isTimeDimension: true, hasChartInspect });
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      await Promise.resolve();
+      expect(tooltipCallback).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining(hasChartInspect ? { datetime: 0, value: 28 } : {
+          datetime: new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(0)),
+          value: new Intl.NumberFormat('de-DE').format(28),
+        })
+      );
     });
 
     test('uses transformed time and forecast metric for overlay, tooltip and popover without replacing callback fields', async () => {

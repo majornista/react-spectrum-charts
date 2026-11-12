@@ -26,7 +26,7 @@ const data: SimpleData[] = [
 const getView = () =>
   ({ signal: jest.fn(), runAsync: jest.fn(), addEventListener: jest.fn(), removeEventListener: jest.fn() }) as unknown as View;
 
-const Harness = ({ chartData }: { chartData: SimpleData[] }): ReactElement => {
+const Harness = ({ chartData, chartView }: { chartData: SimpleData[]; chartView?: View }): ReactElement => {
   const ref = useRef<HTMLDivElement>(null);
   return (
     <div ref={ref} data-testid="dn-container" style={{ position: 'relative' }}>
@@ -36,13 +36,31 @@ const Harness = ({ chartData }: { chartData: SimpleData[] }): ReactElement => {
         dimension="browser"
         chartId="navigator-test"
         containerRef={ref}
-        getView={getView}
+        getView={chartView ? () => chartView : getView}
       />
     </div>
   );
 };
 
 describe('Navigator', () => {
+  test('rebuilds on hidden-series changes and removes its listener on unmount', async () => {
+    const readData = jest.fn().mockReturnValue([]);
+    const addSignalListener = jest.fn();
+    const removeSignalListener = jest.fn();
+    const chartView = {
+      signal: jest.fn(), data: readData, addSignalListener, removeSignalListener,
+      addEventListener: jest.fn(), removeEventListener: jest.fn(),
+    } as unknown as View;
+    const { unmount } = render(<Harness chartData={data} chartView={chartView} />);
+    await waitFor(() => expect(addSignalListener).toHaveBeenCalledWith('hiddenSeries', expect.any(Function)));
+    const handler = addSignalListener.mock.calls.find(([name]) => name === 'hiddenSeries')?.[1];
+    const readsBeforeChange = readData.mock.calls.length;
+    handler('hiddenSeries', ['Chrome']);
+    await waitFor(() => expect(readData.mock.calls.length).toBeGreaterThan(readsBeforeChange));
+    unmount();
+    expect(removeSignalListener).toHaveBeenCalledWith('hiddenSeries', handler);
+  });
+
   test('renders no DOM of its own', () => {
     const { container } = render(<Navigator chartType="bar" data={data} dimension="browser" chartId="t" containerRef={{ current: null }} getView={getView} />);
     expect(container).toBeEmptyDOMElement();

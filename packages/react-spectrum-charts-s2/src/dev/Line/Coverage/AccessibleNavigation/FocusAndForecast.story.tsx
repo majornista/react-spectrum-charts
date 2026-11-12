@@ -13,13 +13,13 @@ import { ReactElement } from 'react';
 
 import { StoryFn } from '@storybook/react';
 
-import { Chart } from '../../../Chart.js';
-import { Axis, ChartInspect, ChartPopover, Legend, Line, LineForecast } from '../../../components/index.js';
-import useChartProps from '../../../hooks/useChartProps.js';
-import { bindWithProps } from '../../../test-utils/index.js';
+import { Chart } from '../../../../Chart.js';
+import { Axis, ChartInspect, ChartPopover, Legend, Line, LineForecast } from '../../../../components/index.js';
+import useChartProps from '../../../../hooks/useChartProps.js';
+import { bindWithProps } from '../../../../test-utils/index.js';
 
 export default {
-  title: 'React Spectrum Charts 2/Line/Regressions/Accessible Navigation',
+  title: 'React Spectrum Charts 2/Line/Coverage/Accessible Navigation',
   component: Line,
 };
 
@@ -52,12 +52,6 @@ const FacetedNavigationStory: StoryFn<typeof Line> = (args): ReactElement => {
 
 const FacetedNavigation = bindWithProps(FacetedNavigationStory);
 FacetedNavigation.args = { name: 'Sales Trend', color: 'series', lineType: 'period' };
-FacetedNavigation.parameters = {
-  regression: {
-    description: 'Custom Line names, default fields, numeric facets, duplicate x values, and multiple marks retain consistent keyboard focus and legend emphasis.',
-    pr: 4,
-  },
-};
 
 const ForecastNavigationStory: StoryFn<typeof Line> = (args): ReactElement => {
   const chartProps = useChartProps({
@@ -85,11 +79,5 @@ const ForecastNavigationStory: StoryFn<typeof Line> = (args): ReactElement => {
 
 const ForecastNavigation = bindWithProps(ForecastNavigationStory);
 ForecastNavigation.args = { name: 'Sales Trend' };
-ForecastNavigation.parameters = {
-  regression: {
-    description: 'Only the first Line receives keyboard focus, with forecast overlays and mark-anchored tooltips aligned to sub-second data.',
-    pr: 4,
-  },
-};
 
 export { FacetedNavigation, ForecastNavigation };
