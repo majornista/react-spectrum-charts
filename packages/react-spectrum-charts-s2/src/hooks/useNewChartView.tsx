@@ -12,7 +12,7 @@
 import { useCallback, useMemo } from 'react';
 
 import { Item, View } from 'vega';
-import { Handler, Options as TooltipOptions } from 'vega-tooltip';
+import { DEFAULT_OPTIONS, Handler, Options as TooltipOptions } from 'vega-tooltip';
 
 import { TOOLTIP_DELAY } from '@spectrum-charts/core-s2/constants';
 
@@ -77,7 +77,6 @@ const useNewChartView = (
       // Add a delay before displaying legend tooltips on hover.
       let inspectTimeout: ReturnType<typeof setTimeout> | undefined;
       view.tooltip((viewRef, event, item, value) => {
-        const inspectHandler = new Handler(inspectOptions);
         // Cancel delayed tooltips if the mouse moves before the delay is resolved.
         if (inspectTimeout) {
           clearTimeout(inspectTimeout);
@@ -89,13 +88,22 @@ const useNewChartView = (
           return;
         }
         setHoveredAxisLabel(null);
+        let tooltipValue = value;
+        let tooltipOptions = inspectOptions;
+        if (event?.type === 'focus' && value != null && value !== '' && inspectOptions.formatTooltip) {
+          const options = { ...DEFAULT_OPTIONS, ...inspectOptions };
+          const content = inspectOptions.formatTooltip(value, options.sanitize, options.maxDepth, options.baseURL);
+          tooltipValue = content.trim() ? value : null;
+          tooltipOptions = { ...inspectOptions, formatTooltip: () => content };
+        }
+        const inspectHandler = new Handler(tooltipOptions);
         if (event?.type === 'pointermove' && itemIsLegendItem(item) && 'tooltip' in item) {
           inspectTimeout = setTimeout(() => {
-            inspectHandler.call(viewRef, event, item, value);
+            inspectHandler.call(viewRef, event, item, tooltipValue);
             inspectTimeout = undefined;
           }, TOOLTIP_DELAY);
         } else {
-          inspectHandler.call(viewRef, event, item, value);
+          inspectHandler.call(viewRef, event, item, tooltipValue);
         }
       });
       if (popovers.length || actionBars.length || legendIsToggleable || onLegendClick) {

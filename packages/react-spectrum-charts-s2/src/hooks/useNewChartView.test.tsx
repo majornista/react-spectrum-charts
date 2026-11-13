@@ -129,6 +129,22 @@ describe('useNewChartView - axis label tooltip wiring', () => {
     datum: {},
   };
 
+  test.each(['', '   ', '<div>Inspect content</div>'])(
+    'only shows keyboard inspection when the formatted content is nonempty (%p)',
+    (content) => {
+      const formatTooltip = jest.fn(() => content);
+      const { result } = renderHook(() =>
+        useNewChartView(baseProps, [], { ...inspectOptions, formatTooltip }, legendProps)
+      );
+      const view = makeFakeView();
+      result.current(view);
+      const tooltipCallback = (view.tooltip as jest.Mock).mock.calls[0][0];
+      tooltipCallback(view, { type: 'focus', clientX: 0, clientY: 0 }, { mark: {} }, { value: 1 });
+      expect(Boolean(document.querySelector('#vg-tooltip-element.visible'))).toBe(Boolean(content.trim()));
+      expect(formatTooltip).toHaveBeenCalledTimes(1);
+    }
+  );
+
   test('hovering an axis label sets hoveredAxisLabel with the item bounds and tooltip content', () => {
     const view = makeFakeView();
     getOnNewView()(view);

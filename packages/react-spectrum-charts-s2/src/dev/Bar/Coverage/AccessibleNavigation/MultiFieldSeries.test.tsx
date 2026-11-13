@@ -11,7 +11,7 @@
  */
 import { ReactElement } from 'react';
 
-import { fireEvent } from '@testing-library/react';
+import { act, fireEvent } from '@testing-library/react';
 
 import { findChart, render, waitFor } from '../../../../test-utils/index.js';
 import { FunnelTimeComparison, TimeComparisonBar, UserGrowthTimeComparison } from './MultiFieldSeries.story.js';
@@ -34,6 +34,19 @@ const enterChartRoot = async (chart: ReactElement) => {
 };
 
 describe('Series split across several fields', () => {
+  test('hides an empty ChartInspect when focus returns from a segment to its month group', async () => {
+    const container = await enterChartRoot(<UserGrowthTimeComparison {...UserGrowthTimeComparison.args} />);
+    await act(async () => { press(container, 'Enter'); });
+    expect(document.querySelector('#vg-tooltip-element.visible')).toBeNull();
+    await act(async () => { press(container, 'Enter'); });
+    await waitFor(() => {
+      expect(document.querySelector('#vg-tooltip-element.visible')).toBeTruthy();
+      expect(document.querySelector('#vg-tooltip-element')?.textContent?.trim()).not.toBe('');
+    });
+    await act(async () => { press(container, 'Escape'); });
+    await waitFor(() => expect(document.querySelector('#vg-tooltip-element.visible')).toBeNull());
+  });
+
   test('time comparison bars read and tell apart each period', async () => {
     const container = await enterChartRoot(<TimeComparisonBar {...TimeComparisonBar.args} />);
     press(container, 'Enter');
