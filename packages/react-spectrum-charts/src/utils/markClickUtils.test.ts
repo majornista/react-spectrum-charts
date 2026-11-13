@@ -40,6 +40,29 @@ const defaultMarkClickArgs: GetOnMarkClickCallbackArgs = {
   trigger: 'click',
 };
 
+describe('bar popover targets', () => {
+  test.each(['bar0_rect', 'bar0_dimensionHoverArea'])('only segment clicks select popover data (%s)', (markName) => {
+    const selectedData = { current: null as unknown };
+    const callback = getOnMarkClickCallback({
+      ...defaultMarkClickArgs,
+      markHasPopover: true,
+      selectedData: selectedData as GetOnMarkClickCallbackArgs['selectedData'],
+    });
+    const item = {
+      datum: { category: 'Chrome', value: 10 },
+      bounds: { x1: 0, y1: 0, x2: 10, y2: 10 },
+      mark: { name: markName, marktype: 'rect', group: { x: 0, y: 0 } },
+    } as unknown as Item;
+    const event = { type: 'click' } as Parameters<ReturnType<typeof getOnMarkClickCallback>>[0];
+    callback(event, item);
+    if (markName === 'bar0_dimensionHoverArea') {
+      expect(selectedData.current).toBeNull();
+    } else {
+      expect(selectedData.current).toStrictEqual({ [COMPONENT_NAME]: 'bar0', category: 'Chrome', value: 10 });
+    }
+  });
+});
+
 describe('getItemBounds()', () => {
   test('should return default bounds if null or undefined', () => {
     expect(getItemBounds(null)).toStrictEqual({ x1: 0, x2: 0, y1: 0, y2: 0 });

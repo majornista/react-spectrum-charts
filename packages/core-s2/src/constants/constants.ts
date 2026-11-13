@@ -184,6 +184,12 @@ export const FOCUSED_REGION = 'focusedRegion'; // chart region focused via keybo
 export const FOCUSED_DIMENSION = 'focusedDimension'; // dimension group (e.g. a whole stack) focused via keyboard navigation
 /** Separator joining fields into a unique data-navigator node id (e.g. stacked segment = dimension + series). */
 export const NAVIGATION_ID_SEPARATOR = '__rsc__';
+/** A point's 1-based position within its line, used for keyboard navigation. */
+export const NAVIGATION_INDEX_FIELD = 'rscNavIndex';
+/** Most recent input method driving focus. */
+export const INTERACTION_MODALITY = 'interactionModality';
+/** Division node id for a single-series Line. */
+export const SINGLE_LINE_NODE_ID = 'line';
 
 // scale names
 export const COLOR_SCALE = 'color';

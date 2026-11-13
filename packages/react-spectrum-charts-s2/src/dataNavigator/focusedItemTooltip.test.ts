@@ -10,14 +10,18 @@
  * governing permissions and limitations under the License.
  */
 import { View } from 'vega';
+import { Handler } from 'vega-tooltip';
 
 import { MARK_ID } from '@spectrum-charts/core-s2/constants';
 
 import {
   findFocusedBarSceneItem,
   findFocusedDimensionAreaSceneItem,
+  findFocusedLineSceneItem,
+  getFocusedLineBounds,
   hideFocusedItemTooltip,
   showFocusedItemTooltip,
+  showFocusedItemTooltipAtPosition,
 } from './focusedItemTooltip.js';
 
 const MARK_NAME = 'bar0';
@@ -42,6 +46,34 @@ const mockView = (ringItems: object[] = [], origin: [number, number] = [0, 0]) =
 beforeEach(() => {
   container = document.createElement('div');
   jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 0, top: 0 } as DOMRect);
+});
+
+describe('showFocusedItemTooltipAtPosition()', () => {
+  test.each(['right', 'bottom'] as const)('honors mark anchoring with %s placement', (placement) => {
+    const handler = new Handler({
+      id: 'line-focus-tooltip',
+      anchor: 'mark',
+      position: [placement],
+      offsetX: 6,
+      offsetY: 6,
+      disableDefaultStyle: true,
+    });
+    const view = mockView([], [5, 7]);
+    (view.tooltip as jest.Mock).mockReturnValue(handler.call);
+    jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 100 } as DOMRect);
+    try {
+      showFocusedItemTooltipAtPosition(
+        container, view, { clientX: 205, clientY: 191 }, { value: 42 },
+        { x1: 96, x2: 104, y1: 80, y2: 88 }
+      );
+      const tooltip = document.getElementById('line-focus-tooltip') as HTMLElement;
+      expect(tooltip.classList.contains('visible')).toBe(true);
+      expect(tooltip.style.left).toBe(placement === 'right' ? '215px' : '205px');
+      expect(tooltip.style.top).toBe(placement === 'right' ? '191px' : '201px');
+    } finally {
+      document.getElementById('line-focus-tooltip')?.remove();
+    }
+  });
 });
 
 describe('showFocusedItemTooltip()', () => {
@@ -157,5 +189,76 @@ describe('findFocusedDimensionAreaSceneItem()', () => {
     const view = mockDimensionAreaView([{ datum: { browser: 'Firefox' } }]);
 
     expect(findFocusedDimensionAreaSceneItem(view, MARK_NAME, 'browser', 'Chrome')).toBeUndefined();
+  });
+});
+
+describe('getFocusedLineBounds()', () => {
+  test.each([undefined, ['series', 'period']])('unions matching segment bounds in page coordinates (facets=%p)', (seriesFields) => {
+    const first = {
+      datum: { series: 'A', period: 'Current' },
+      bounds: { x1: 0, y1: 1, x2: 20, y2: 10 },
+      mark: { group: { x: 10, y: 30 } },
+    };
+    const second = {
+      datum: { series: 'A', period: 'Current' },
+      bounds: { x1: 5, y1: -5, x2: 25, y2: 15 },
+      mark: { group: { x: 50, y: 10, mark: { group: { x: 5, y: 2 } } } },
+    };
+    const unrelated = { datum: { series: 'B', period: 'Current' }, bounds: { x1: -999, y1: -999, x2: 999, y2: 999 } };
+    const view = {
+      scenegraph: () => ({ root: { items: [{ marktype: 'line', name: 'line0', items: [first, unrelated, second] }] } }),
+      origin: () => [3, 7],
+    } as unknown as View;
+    jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 200 } as DOMRect);
+    const colorValue = seriesFields ? 'A | Current' : 'A';
+    expect(getFocusedLineBounds(view, container, 'line0', 'series', colorValue, seriesFields))
+      .toEqual({ x1: 113, y1: 214, x2: 183, y2: 247 });
+    expect(getFocusedLineBounds(view, container, 'line0', 'series', 'Missing', seriesFields)).toBeUndefined();
+    expect(getFocusedLineBounds(view, container, 'line0', undefined, undefined))
+      .toEqual({ x1: -896, y1: -792, x2: 1102, y2: 1206 });
+  });
+
+  test('returns undefined when matching segments have no bounds', () => {
+    const view = {
+      scenegraph: () => ({ root: { items: [{ marktype: 'line', name: 'line0', items: [{ datum: { series: 'A' } }] }] } }),
+    } as unknown as View;
+    expect(getFocusedLineBounds(view, container, 'line0', 'series', 'A')).toBeUndefined();
+  });
+});
+
+describe('findFocusedLineSceneItem()', () => {
+  const LINE_NAME = 'line0';
+
+  const mockLineView = (items: { datum: Record<string, unknown> }[]) =>
+    ({
+      scenegraph: () => ({ root: { items: [{ marktype: 'line', name: LINE_NAME, items }] } }),
+    }) as unknown as View;
+
+  test('finds a rendered line item whose datum carries the given color value', () => {
+    const match = { datum: { series: 'A', value: 28 } };
+    const view = mockLineView([{ datum: { series: 'B', value: 20 } }, match]);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', 'A')).toBe(match);
+  });
+
+  test('returns undefined when no rendered item matches the given color value', () => {
+    const view = mockLineView([{ datum: { series: 'B', value: 20 } }]);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', 'A')).toBeUndefined();
+  });
+
+  test('matches numeric rendered facets to string navigation keys', () => {
+    const match = { datum: { series: 7 } };
+    const view = mockLineView([{ datum: { series: 8 } }, match]);
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', '7')).toBe(match);
+    expect(findFocusedLineSceneItem(view, LINE_NAME, 'series', '7', ['series'])).toBe(match);
+  });
+
+  // A single-series line has no color field to match on — there's only one line, so any of its rendered items works.
+  test('with no color field (single-series), returns the first rendered item regardless of datum', () => {
+    const items = [{ datum: { value: 28 } }, { datum: { value: 43 } }];
+    const view = mockLineView(items);
+
+    expect(findFocusedLineSceneItem(view, LINE_NAME, undefined, undefined)).toBe(items[0]);
   });
 });

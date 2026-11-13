@@ -12,7 +12,7 @@
 import { NodeObject } from 'data-navigator';
 import { View } from 'vega';
 
-import { applyHoverParitySignals, findFocusedStackRow } from './barHoverParity.js';
+import { applyHoverParitySignals, findFocusedRow, findFocusedStackRow } from './barHoverParity.js';
 
 const rows = [
   { browser: 'Chrome', os: 'Windows', value: 18000, rscMarkId: 0 },
@@ -84,6 +84,21 @@ describe('applyHoverParitySignals()', () => {
 
     expect(signal).toHaveBeenCalledWith('bar0_hoveredItem', basicRows[0]);
     expect(signal).toHaveBeenCalledWith('bar0_dimensionHoverArea_hoveredItem', basicRows[0]);
+  });
+});
+
+describe('findFocusedRow()', () => {
+  test('resolves duplicate Line x values by the mark-specific navigation index without changing Bar lookup', () => {
+    const { view } = mockView();
+    const points = [
+      { x: 1, series: 'A', value: 10, line0_rscNavIndex: 1, line1_rscNavIndex: 2 },
+      { x: 1, series: 'A', value: 20, line0_rscNavIndex: 2, line1_rscNavIndex: 3 },
+    ];
+    (view.data as jest.Mock).mockReturnValue(points);
+    const node = { data: { x: 1, series: 'A', rscNavIndex: 2 } } as unknown as NodeObject;
+    expect(findFocusedRow(view, node, 'x', 'series', ['series'], 'line0')).toBe(points[1]);
+    expect(findFocusedRow(view, node, 'x', 'series', ['series'], 'line1')).toBe(points[0]);
+    expect(findFocusedRow(view, node, 'x', 'series')).toBe(points[0]);
   });
 });
 

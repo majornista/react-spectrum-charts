@@ -12,12 +12,17 @@
 import dataNavigator, { NodeObject, Structure, StructureOptions } from 'data-navigator';
 import { parseColor } from 'react-stately';
 
-import { DEFAULT_CATEGORICAL_DIMENSION, DEFAULT_METRIC, NAVIGATION_ID_SEPARATOR, SERIES_ID } from '@spectrum-charts/core-s2/constants';
+import {
+  DEFAULT_CATEGORICAL_DIMENSION,
+  DEFAULT_METRIC,
+  NAVIGATION_ID_SEPARATOR,
+  SERIES_ID,
+} from '@spectrum-charts/core-s2/constants';
 import { Orientation, SimpleData } from '@spectrum-charts/vega-spec-builder-s2';
 
 import { getSeriesKey } from './barSeries.js';
-import { addSiblingKeySynonyms, getBaseNavigationRules } from './navigationRules.js';
 import { DEFAULT_DATA_NAVIGATOR_LOCALE, getDataNavigatorIntl } from './dataNavigatorIntl.js';
+import { addSiblingKeySynonyms, getBaseNavigationRules } from './navigationRules.js';
 
 export interface BuildBarStructureOptions {
   /** The chart data (plain objects). */
@@ -97,12 +102,19 @@ export interface BarStructure {
 }
 
 /** Orders one stack's segments in reading order: the topmost first for a vertical bar, the origin segment first for a horizontal bar. */
-const orderStack = (rows: SimpleData[], orientation: Orientation, type: 'dodged' | 'stacked' | undefined, order?: string): SimpleData[] => {
+const orderStack = (
+  rows: SimpleData[],
+  orientation: Orientation,
+  type: 'dodged' | 'stacked' | undefined,
+  order?: string
+): SimpleData[] => {
   const isHorizontal = orientation === 'horizontal';
   if (order) {
     // Vega stacks a higher `order` further from the baseline; vertical reads from that (top) end, horizontal from the origin (left).
     const ascending = isHorizontal && type !== 'dodged';
-    return [...rows].sort((a, b) => (ascending ? Number(a[order]) - Number(b[order]) : Number(b[order]) - Number(a[order])));
+    return [...rows].sort((a, b) =>
+      ascending ? Number(a[order]) - Number(b[order]) : Number(b[order]) - Number(a[order])
+    );
   }
   // No order field: Vega stacks the last-encountered row furthest out — reverse for vertical's top-first, keep as-is for horizontal's origin-first.
   return isHorizontal ? [...rows] : [...rows].reverse();
@@ -233,7 +245,12 @@ const wireAdjacentColumnNavigation = (
     const nextSegments = [...columnList[index + 1].values()];
     const lastSegment = currentSegments.at(-1);
     const firstNextSegment = nextSegments[0];
-    if (type === 'dodged' && lastSegment && firstNextSegment && !hasNavigationEdge(structure, lastSegment, firstNextSegment)) {
+    if (
+      type === 'dodged' &&
+      lastSegment &&
+      firstNextSegment &&
+      !hasNavigationEdge(structure, lastSegment, firstNextSegment)
+    ) {
       addNavigationEdge(structure, lastSegment, firstNextSegment, withinGroupRules);
     }
   }
@@ -272,7 +289,8 @@ const removeLeafEdges = (structure: Structure): void => {
   for (const [edgeId, edge] of Object.entries(structure.edges)) {
     const source = typeof edge.source === 'string' ? structure.nodes[edge.source] : undefined;
     const target = typeof edge.target === 'string' ? structure.nodes[edge.target] : undefined;
-    if (source && target && source.dimensionLevel == null && target.dimensionLevel == null) removeEdge(structure, edgeId);
+    if (source && target && source.dimensionLevel == null && target.dimensionLevel == null)
+      removeEdge(structure, edgeId);
   }
 };
 
@@ -304,8 +322,11 @@ const wireDodgedStackNavigation = (
   stackFields: string[]
 ): void => {
   removeLeafEdges(structure);
-  const stacks = groupRows(orderedData, (row) => `${row[dimension]}${NAVIGATION_ID_SEPARATOR}${getSeriesKey(row, dodgeFields)}`).map(
-    (rows) => rows.map((row) => ({ id: segmentId(row[dimension], row[seriesField]), stackKey: getSeriesKey(row, stackFields) }))
+  const stacks = groupRows(
+    orderedData,
+    (row) => `${row[dimension]}${NAVIGATION_ID_SEPARATOR}${getSeriesKey(row, dodgeFields)}`
+  ).map((rows) =>
+    rows.map((row) => ({ id: segmentId(row[dimension], row[seriesField]), stackKey: getSeriesKey(row, stackFields) }))
   );
   for (const [index, stack] of stacks.entries()) {
     for (let segment = 0; segment < stack.length - 1; segment++) {
@@ -452,12 +473,22 @@ export interface NodeLabelOptions {
 /** A row's `field: value` parts, limited to `fieldLabels` (and labeled by them) when provided, with color/metric-series overrides applied. `excludeFields` drops fields already stated elsewhere (e.g. a division's own dimension value). */
 export const buildFieldValueParts = (
   data: Record<string, unknown>,
-  { dimension, fieldLabels = {}, dimensionLabels, colorOverride, order, metricSeriesLabel, locale = 'en-US' }: NodeLabelOptions,
+  {
+    dimension,
+    fieldLabels = {},
+    dimensionLabels,
+    colorOverride,
+    order,
+    metricSeriesLabel,
+    locale = 'en-US',
+  }: NodeLabelOptions,
   excludeFields: string[] = []
 ): string[] => {
   const labeledFields = Object.keys(fieldLabels).filter((field) => !excludeFields.includes(field));
   const includedFields = [
-    ...new Set([...labeledFields, colorOverride, metricSeriesLabel?.metric].filter((field): field is string => field != null)),
+    ...new Set(
+      [...labeledFields, colorOverride, metricSeriesLabel?.metric].filter((field): field is string => field != null)
+    ),
   ].filter((field) => !excludeFields.includes(field));
   const entries: [string, unknown][] = labeledFields.length
     ? includedFields.filter((field) => data[field] != null).map((field) => [field, data[field]])
@@ -492,7 +523,11 @@ const buildRootLabel = (node: NodeObject, options: NodeLabelOptions): string => 
   if (!dimension || !metric) return String(node.id);
   const { formatMessage } = getDataNavigatorIntl(locale);
   const count = rows ? new Set(rows.map((row) => row[dimension])).size : 0;
-  const variables = { dimension: fieldLabels[dimension] ?? dimension, count, metricLabel: fieldLabels[metric] ?? metric };
+  const variables = {
+    dimension: fieldLabels[dimension] ?? dimension,
+    count,
+    metricLabel: fieldLabels[metric] ?? metric,
+  };
   if (color) return formatMessage('bar.stackedDescription', { ...variables, color: fieldLabels[color] ?? color });
   return formatMessage('bar.description', variables);
 };
@@ -502,10 +537,13 @@ const buildDivisionLabel = (node: NodeObject, options: NodeLabelOptions): string
   const { dimension, data: rows, rowsByDimension, fieldLabels = {}, dimensionLabels } = options;
   if (!dimension || !rows) return String(node.id);
   // The division's own id is a data-navigator-internal composite, not the dimension value itself.
-  const dimensionValue = node.derivedNode ? (node.data as Record<string, unknown> | undefined)?.[node.derivedNode] : undefined;
+  const dimensionValue = node.derivedNode
+    ? (node.data as Record<string, unknown> | undefined)?.[node.derivedNode]
+    : undefined;
   const dimensionKey = toDimensionKey(dimensionValue);
   if (dimensionKey === undefined) return String(node.id);
-  const groupRows = rowsByDimension?.get(dimensionKey) ?? rows.filter((row) => toDimensionKey(row[dimension]) === dimensionKey);
+  const groupRows =
+    rowsByDimension?.get(dimensionKey) ?? rows.filter((row) => toDimensionKey(row[dimension]) === dimensionKey);
   if (groupRows.length === 0) return String(node.id);
   const header = `${fieldLabels[dimension] ?? dimension}: ${getDimensionLabel(dimensionKey, dimensionLabels)}.`;
   const segments = groupRows

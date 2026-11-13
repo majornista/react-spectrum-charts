@@ -71,6 +71,11 @@ describe('stackedBarUtils', () => {
     test('default options', () => {
       expect(getStackedBarMarks(defaultBarOptions)).toStrictEqual([defaultBackgroundMark, defaultMark]);
     });
+    test('accessible navigation makes bars pointer targets without other interactions', () => {
+      const marks = getStackedBarMarks({ ...defaultBarOptions, accessibleNavigation: true });
+      expect(marks.find((mark) => mark.name === 'bar0')).toHaveProperty('interactive', true);
+      expect(marks.find((mark) => mark.name === 'bar0_background')).toHaveProperty('interactive', false);
+    });
     test('with annotation', () => {
       const marks = getStackedBarMarks({
         ...defaultBarOptions,

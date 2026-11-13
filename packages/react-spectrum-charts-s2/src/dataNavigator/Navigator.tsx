@@ -27,7 +27,7 @@ export interface NavigatorProps {
   dimension?: string;
   /** Series / color field (set for stacked bars), read as the series' name in labels. */
   color?: string;
-  /** Every field dividing the bar into series, in the chart's series-id order. Must be memoized. */
+  /** Every field dividing the mark into series, in the chart's series-id order. Must be memoized. */
   seriesFields?: string[];
   /** For a dodged-and-stacked bar, the fields splitting each category into side-by-side stacks. Must be memoized. */
   dodgeFields?: string[];
@@ -39,12 +39,22 @@ export interface NavigatorProps {
   colorOverride?: string;
   /** Locale used for accessible color names. */
   locale?: string;
+  numberLocale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
+  /** Line-only: rendered metric field used for projected bounds, separate from accessible labels. */
+  plottingMetric?: string;
+  /** Line-only: the metric scale name and whether it has primary/secondary scales. */
+  metricAxis?: string;
+  dualMetricAxis?: boolean;
   /** The stack sort field. When set on a stacked bar, determines which segment is reached first, mirroring Vega's own stack sort. */
   order?: string;
   /** Chart orientation. Swaps which arrow keys move between stacks vs. within a stack. Defaults to vertical. */
   orientation?: Orientation;
+  /** Line-only: whether the dimension field is time-scaled; formats it as a date in accessible labels. */
+  isTimeDimension?: boolean;
+  /** Line-only: the line's x-scale type, used to resolve a focused point's rendered position for popover/tooltip anchoring. */
+  scaleType?: string;
   /** Maps a data field to its axis/legend title — drives the focused leaf's accessible name and a clean focus tooltip for bars without a ChartInspect. */
   fieldLabels?: Record<string, string>;
   /** Per-series metric-axis titles for dual-metric-axis bars. */
@@ -63,6 +73,7 @@ export interface NavigatorProps {
   chartId: string;
   /** Accessor for the live Vega view. */
   getView: () => View | undefined;
+  view?: View;
   /** Same context refs `handleMarkClick` uses — Space opens a focused bar/segment's popover through the exact same trigger. */
   selectedData?: RefObject<Datum | null>;
   selectedDataBounds?: RefObject<MarkBounds>;
@@ -86,9 +97,15 @@ export const Navigator = ({
   type,
   colorOverride,
   locale,
+  numberLocale,
   metric,
+  plottingMetric,
+  metricAxis,
+  dualMetricAxis,
   order,
   orientation,
+  isTimeDimension,
+  scaleType,
   fieldLabels,
   metricTitleBySeries,
   hasChartInspect,
@@ -98,6 +115,7 @@ export const Navigator = ({
   containerRef,
   chartId,
   getView,
+  view,
   selectedData,
   selectedDataBounds,
   selectedDataName,
@@ -123,9 +141,15 @@ export const Navigator = ({
         type,
         colorOverride,
         locale,
+        numberLocale,
         metric,
+        plottingMetric,
+        metricAxis,
+        dualMetricAxis,
         order,
         orientation,
+        isTimeDimension,
+        scaleType,
         fieldLabels,
         metricTitleBySeries,
         hasChartInspect,
@@ -142,18 +166,31 @@ export const Navigator = ({
         hasChartPopover,
       });
     let raf: number | undefined;
+    let observedView: View | undefined;
     let retryCount = 0;
     const attachAndRetry = () => {
       attach();
-      if (!getView() && retryCount < 3) {
+      const currentView = view ?? getView();
+      if (currentView && !observedView) {
+        try {
+          currentView.addSignalListener('hiddenSeries', onHiddenSeriesChange);
+          observedView = currentView;
+        } catch {}
+      }
+      if (!currentView && retryCount < 3) {
         retryCount += 1;
         raf = requestAnimationFrame(attachAndRetry);
       }
+    };
+    const onHiddenSeriesChange = () => {
+      if (raf !== undefined) cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(attachAndRetry);
     };
     // Attach promptly so the entry control is available while Vega finishes exposing its view.
     raf = requestAnimationFrame(attachAndRetry);
     return () => {
       if (raf !== undefined) cancelAnimationFrame(raf);
+      observedView?.removeSignalListener('hiddenSeries', onHiddenSeriesChange);
     };
   }, [
     chartType,
@@ -166,9 +203,15 @@ export const Navigator = ({
     type,
     colorOverride,
     locale,
+    numberLocale,
     metric,
+    plottingMetric,
+    metricAxis,
+    dualMetricAxis,
     order,
     orientation,
+    isTimeDimension,
+    scaleType,
     fieldLabels,
     metricTitleBySeries,
     hasChartInspect,
@@ -178,6 +221,7 @@ export const Navigator = ({
     chartId,
     containerRef,
     getView,
+    view,
     selectedData,
     selectedDataBounds,
     selectedDataName,

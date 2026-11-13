@@ -9,10 +9,10 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { FOCUSED_DIMENSION, FOCUSED_REGION, NAVIGATION_ID_SEPARATOR, SELECTED_ITEM, SERIES_ID } from '@spectrum-charts/core-s2/constants';
+import { FOCUSED_DIMENSION, NAVIGATION_ID_SEPARATOR, SELECTED_ITEM, SERIES_ID } from '@spectrum-charts/core-s2/constants';
 
 import { defaultBarOptions, defaultBarOptionsWithSecondayColor } from './barTestUtils.js';
-import { getBarFocusRing, getChartFocusRing, getDodgedGroupFocusRing, getStackFocusRing } from './barFocusRingUtils.js';
+import { getBarFocusRing, getDodgedGroupFocusRing, getStackFocusRing } from './barFocusRingUtils.js';
 
 const { dimension, metric } = defaultBarOptions;
 
@@ -58,26 +58,13 @@ describe('getBarFocusRing()', () => {
   });
 });
 
-describe('getChartFocusRing()', () => {
-  test('covers the full plot area and keys opacity on the chart region', () => {
-    const ring = getChartFocusRing(defaultBarOptions);
-    expect(ring).toHaveProperty('name', 'chartFocusRing');
-    expect(ring.encode?.update?.x).toEqual({ value: 0 });
-    expect(ring.encode?.update?.x2).toEqual({ signal: 'width' });
-    expect(ring.encode?.update?.opacity).toEqual([
-      { test: `${FOCUSED_REGION} === 'chart'`, value: 1 },
-      { value: 0 },
-    ]);
-  });
-});
-
 describe('getStackFocusRing()', () => {
   test('sources from the per-stack data and keys opacity on the focused dimension', () => {
     const ring = getStackFocusRing(defaultBarOptions);
     expect(ring).toHaveProperty('name', 'bar0_stackFocusRing');
     expect(ring.from).toEqual({ data: 'bar0_stacks' });
     expect(ring.encode?.update?.opacity).toEqual([
-      { test: `${FOCUSED_DIMENSION} === ("" + datum.${dimension})`, value: 1 },
+      { test: `!isValid(${defaultBarOptions.name}_pointerHovered) && ${FOCUSED_DIMENSION} === ("" + datum.${dimension})`, value: 1 },
       { value: 0 },
     ]);
   });
@@ -112,7 +99,7 @@ describe('getDodgedGroupFocusRing()', () => {
     expect(ring).toHaveProperty('name', 'bar0_stackFocusRing');
     expect(ring.from).toEqual({ data: 'bar0_groups' });
     expect(ring.encode?.update?.opacity).toEqual([
-      { test: `${FOCUSED_DIMENSION} === ("" + datum.${dimension})`, value: 1 },
+      { test: `!isValid(${defaultBarOptions.name}_pointerHovered) && ${FOCUSED_DIMENSION} === ("" + datum.${dimension})`, value: 1 },
       { value: 0 },
     ]);
   });

@@ -24,6 +24,18 @@ describe('combineElementNames()', () => {
 });
 
 describe('toCamelCase()', () => {
+  test.each([
+    ['KPI2', 'kPI2'],
+    ['KPI2024', 'kPI2024'],
+    ['HTTP2Server', 'hTTP2Server'],
+    ['ABC1', 'aBC1'],
+    ['PDF2Text', 'pDF2Text'],
+    ['ABC_value', 'aBCValue'],
+    ['ABCValue', 'abcValue'],
+    ['ABC', 'abc'],
+  ])('preserves legacy name generation for %s', (input, expected) => {
+    expect(toCamelCase(input)).toBe(expected);
+  });
   test('camelCase should convert to camelCase', () => {
     expect(toCamelCase('camelTest')).toStrictEqual('camelTest');
   });

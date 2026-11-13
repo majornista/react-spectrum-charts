@@ -9,7 +9,7 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { Data, Legend, LegendEncode, Scale, SymbolEncodeEntry } from 'vega';
+import { Data, Legend, LegendEncode, Scale, SymbolEncodeEntry, View, expressionFunction, parse } from 'vega';
 
 import {
   COLOR_SCALE,
@@ -18,6 +18,8 @@ import {
   DEFAULT_COLOR_SCHEME,
   DEFAULT_SECONDARY_COLOR,
   FILTERED_TABLE,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
   GROUP_ID,
   HOVERED_SERIES,
   LINEAR_COLOR_SCALE,
@@ -25,6 +27,8 @@ import {
   TABLE,
 } from '@spectrum-charts/core-s2/constants';
 
+import { buildSpec } from '../chartSpecBuilder.js';
+import { getExpressionFunctions } from '../expressionFunctions/index.js';
 import {
   defaultChartSizeFontSizeSignal,
   defaultChartSizeHoverStrokeWidthSignal,
@@ -153,6 +157,34 @@ const defaultLegendEntriesScale: Scale = {
 };
 
 describe('addLegend()', () => {
+  test.each(['scatter', 'area'] as const)('omits navigation expressions for an interactive %s without focus signals', async (markType) => {
+    Object.entries(getExpressionFunctions()).forEach(([name, implementation]) => {
+      expressionFunction(name, implementation);
+    });
+    expressionFunction('rscContainerWidth', () => 400);
+    const rows = [
+      { datetime: 0, value: 10, x: 0, y: 10, series: 'A' },
+      { datetime: 1000, value: 20, x: 1, y: 20, series: 'B' },
+    ];
+    const spec = buildSpec({
+      data: rows,
+      accessibleNavigation: true,
+      animations: false,
+      marks: [{ markType, color: 'series', chartInspects: [{}] }],
+      legends: [{}],
+    });
+    const view = new View(parse(spec), { renderer: 'none' });
+    try {
+      view.width(400).height(300).data(TABLE, rows);
+      await view.runAsync();
+      expect(spec.signals?.some(({ name }) => name === FOCUSED_ITEM)).toBe(false);
+      expect(JSON.stringify(spec.legends)).not.toContain(FOCUSED_ITEM);
+      expect(JSON.stringify(spec.legends)).not.toContain(FOCUSED_DIMENSION);
+    } finally {
+      view.finalize();
+    }
+  });
+
   describe('no initial legend', () => {
     test('no options, should setup default legend', () => {
       expect(addLegend(defaultSpec, {})).toStrictEqual({

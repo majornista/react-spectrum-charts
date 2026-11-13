@@ -15,7 +15,7 @@ import { RectEncodeEntry, RectMark } from 'vega';
 import {
   FOCUSED_DIMENSION,
   FOCUSED_ITEM,
-  FOCUSED_REGION,
+  MARK_ID,
   NAVIGATION_ID_SEPARATOR,
   SELECTED_ITEM,
   SERIES_ID,
@@ -109,31 +109,13 @@ export const getBarFocusRing = (options: BarSpecOptions): RectMark => {
         x2: { signal: `datum.bounds.x2 + ${FOCUS_RING_OFFSET}` },
         y: { signal: `datum.bounds.y1 - ${FOCUS_RING_OFFSET}` },
         y2: { signal: `datum.bounds.y2 + ${FOCUS_RING_OFFSET}` },
-        opacity: [{ test: `${FOCUSED_ITEM} === (${focusedItemId}) && !(${isSelected})`, value: 1 }, { value: 0 }],
-      },
-    },
-  };
-};
-
-export const getChartFocusRing = (options: BarSpecOptions): RectMark => {
-  const { colorScheme } = options;
-  return {
-    name: 'chartFocusRing',
-    type: 'rect',
-    interactive: false,
-    encode: {
-      enter: {
-        fill: { value: 'transparent' },
-        strokeWidth: { value: FOCUS_RING_STROKE_WIDTH },
-        stroke: { value: getS2ColorValue('blue-800', colorScheme) },
-        cornerRadius: { value: FOCUS_RING_ROUNDED_RADIUS },
-      },
-      update: {
-        x: { value: 0 },
-        x2: { signal: 'width' },
-        y: { value: 0 },
-        y2: { signal: 'height' },
-        opacity: [{ test: `${FOCUSED_REGION} === 'chart'`, value: 1 }, { value: 0 }],
+        opacity: [
+          {
+            test: `(!isValid(${name}_pointerHovered) || ${name}_pointerHovered.${MARK_ID} === datum.datum.${MARK_ID}) && ${FOCUSED_ITEM} === (${focusedItemId}) && !(${isSelected})`,
+            value: 1,
+          },
+          { value: 0 },
+        ],
       },
     },
   };
@@ -179,7 +161,7 @@ export const getStackFocusRing = (options: BarSpecOptions): RectMark => {
       },
       update: {
         ...update,
-        opacity: [{ test: isFocusedDimension, value: 1 }, { value: 0 }],
+        opacity: [{ test: `!isValid(${name}_pointerHovered) && ${isFocusedDimension}`, value: 1 }, { value: 0 }],
       },
     },
   };
@@ -253,7 +235,7 @@ export const getDodgedGroupFocusRing = (options: BarSpecOptions): RectMark => {
       },
       update: {
         ...update,
-        opacity: [{ test: isFocusedDimension, value: 1 }, { value: 0 }],
+        opacity: [{ test: `!isValid(${name}_pointerHovered) && ${isFocusedDimension}`, value: 1 }, { value: 0 }],
       },
     },
   };

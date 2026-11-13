@@ -9,7 +9,28 @@
  * OF ANY KIND, either express or implied. See the License for the specific language
  * governing permissions and limitations under the License.
  */
-import { getPopoverMarkName } from './lineUtils.js';
+import { View, parse } from 'vega';
+
+import { defaultLineOptions } from './lineTestUtils.js';
+import { getLineSeriesIdExpr, getPopoverMarkName } from './lineUtils.js';
+
+describe('getLineSeriesIdExpr()', () => {
+  test.each(['', null, undefined, 0, 7])('matches the navigation identity for series=%s', async (series) => {
+    const view = new View(parse({
+      data: [{
+        name: 'identities',
+        values: [{ series }],
+        transform: [{ type: 'formula', as: 'identity', expr: getLineSeriesIdExpr(defaultLineOptions) ?? 'null' }],
+      }],
+    }), { renderer: 'none' });
+    try {
+      await view.runAsync();
+      expect(view.data('identities')[0].identity).toBe(String(series));
+    } finally {
+      view.finalize();
+    }
+  });
+});
 
 describe('getPopoverMarkName()', () => {
   test('should return undefined if there are no popovers', () => {

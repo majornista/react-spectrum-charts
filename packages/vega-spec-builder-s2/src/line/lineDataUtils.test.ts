@@ -14,8 +14,13 @@ import { FilterTransform, FormulaTransform } from 'vega';
 import {
   CONTROLLED_HIGHLIGHTED_SERIES,
   CONTROLLED_HIGHLIGHTED_TABLE,
+  FOCUSED_DIMENSION,
+  FOCUSED_ITEM,
   GROUP_ID,
   HOVERED_ITEM,
+  INTERACTION_MODALITY,
+  NAVIGATION_ID_SEPARATOR,
+  NAVIGATION_INDEX_FIELD,
   SELECTED_ITEM,
   SELECTED_SERIES,
   SERIES_ID,
@@ -25,6 +30,18 @@ import { getHoverLabelData, getLineHighlightedData, getLineHoverRules, getPrimar
 import { defaultLineOptions } from './lineTestUtils.js';
 
 describe('getLineHighlightedData()', () => {
+  test.each(['lineType', 'opacity'] as const)('matches the full field-backed %s identity', (facet) => {
+    const highlighted = getLineHighlightedData({
+      ...defaultLineOptions,
+      accessibleNavigation: true,
+      [facet]: 'period',
+    });
+    expect(highlighted.transform?.[0]).toHaveProperty(
+      'expr',
+      expect.stringContaining(`${FOCUSED_ITEM} === datum.series + " | " + datum.period + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`)
+    );
+  });
+
   test('should include select signal if hasPopover', () => {
     const expr = (
       getLineHighlightedData({ ...defaultLineOptions, chartPopovers: [{}] }).transform?.[0] as FilterTransform
@@ -45,6 +62,25 @@ describe('getLineHighlightedData()', () => {
       }).transform?.[0] as FilterTransform
     ).expr;
     expect(expr.includes(GROUP_ID)).toBeTruthy();
+  });
+
+  test('with accessibleNavigation, defers to the focus match when keyboard was the last modality', () => {
+    const expr = (
+      getLineHighlightedData({ ...defaultLineOptions, accessibleNavigation: true }).transform?.[0] as FilterTransform
+    ).expr;
+    expect(expr).toContain(INTERACTION_MODALITY);
+    expect(expr).toContain(`${FOCUSED_ITEM} === ('' + (datum.series)) + "${NAVIGATION_ID_SEPARATOR}" + datum.line0_${NAVIGATION_INDEX_FIELD}`);
+  });
+
+  test('with accessibleNavigation and a static color, keys the focus match on the index alone', () => {
+    const expr = (
+      getLineHighlightedData({
+        ...defaultLineOptions,
+        accessibleNavigation: true,
+        color: { value: 'categorical-100' },
+      }).transform?.[0] as FilterTransform
+    ).expr;
+    expect(expr).toContain(`${FOCUSED_ITEM} === '' + datum.line0_${NAVIGATION_INDEX_FIELD}`);
   });
 });
 
@@ -147,5 +183,41 @@ describe('getLineHoverRules()', () => {
       'popoverMatch',
       'comboSiblingMatch',
     ]);
+  });
+
+  test('with accessibleNavigation, gates hoveredMatch on interaction modality and adds a trailing focusMatch rule', () => {
+    const rules = getLineHoverRules({
+      ...defaultLineOptions,
+      accessibleNavigation: true,
+      interactiveMarkName: 'line0',
+    });
+    expect(rules[0]).toStrictEqual({
+      as: 'hoveredMatch',
+      expr: `isValid(line0_${HOVERED_ITEM}) && ${INTERACTION_MODALITY} !== 'keyboard' ? (line0_${HOVERED_ITEM}.${SERIES_ID} === datum.${SERIES_ID} ? 1 : 0) : null`,
+    });
+    expect(rules.at(-1)?.as).toBe('focusMatch');
+    expect(rules.at(-1)?.expr).toContain(FOCUSED_DIMENSION);
+    expect(rules.at(-1)?.expr).toContain(FOCUSED_ITEM);
+  });
+
+  test('with accessibleNavigation and a static color, does not add a focusMatch rule', () => {
+    const rules = getLineHoverRules({
+      ...defaultLineOptions,
+      accessibleNavigation: true,
+      color: { value: 'categorical-100' },
+    });
+    expect(rules.some((r) => r.as === 'focusMatch')).toBe(false);
+  });
+
+  test.each(['lineType', 'opacity'] as const)('matches retained aggregate series ids with a field-backed %s and static color', (facet) => {
+    const rules = getLineHoverRules({
+      ...defaultLineOptions,
+      accessibleNavigation: true,
+      color: { value: 'categorical-100' },
+      [facet]: 'period',
+    });
+    const expr = rules.find((rule) => rule.as === 'focusMatch')?.expr;
+    expect(expr).toContain(`datum.${SERIES_ID}`);
+    expect(expr).not.toContain('datum.period');
   });
 });
