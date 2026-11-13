@@ -73,6 +73,7 @@ export interface NavigatorProps {
   chartId: string;
   /** Accessor for the live Vega view. */
   getView: () => View | undefined;
+  view?: View;
   /** Same context refs `handleMarkClick` uses — Space opens a focused bar/segment's popover through the exact same trigger. */
   selectedData?: RefObject<Datum | null>;
   selectedDataBounds?: RefObject<MarkBounds>;
@@ -114,6 +115,7 @@ export const Navigator = ({
   containerRef,
   chartId,
   getView,
+  view,
   selectedData,
   selectedDataBounds,
   selectedDataName,
@@ -168,14 +170,14 @@ export const Navigator = ({
     let retryCount = 0;
     const attachAndRetry = () => {
       attach();
-      const view = getView();
-      if (view && !observedView) {
+      const currentView = view ?? getView();
+      if (currentView && !observedView) {
         try {
-          view.addSignalListener('hiddenSeries', onHiddenSeriesChange);
-          observedView = view;
+          currentView.addSignalListener('hiddenSeries', onHiddenSeriesChange);
+          observedView = currentView;
         } catch {}
       }
-      if (!view && retryCount < 3) {
+      if (!currentView && retryCount < 3) {
         retryCount += 1;
         raf = requestAnimationFrame(attachAndRetry);
       }
@@ -219,6 +221,7 @@ export const Navigator = ({
     chartId,
     containerRef,
     getView,
+    view,
     selectedData,
     selectedDataBounds,
     selectedDataName,

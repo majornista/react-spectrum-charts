@@ -85,6 +85,19 @@ export const findFocusedDimensionAreaSceneItem = (
 ): SceneNode | undefined =>
   findSceneItems(view, 'rect', `${markName}_${DIMENSION_HOVER_AREA}`).find((item) => item.datum?.[dimension] === dimensionValue);
 
+const findFocusedLineSceneItems = (
+  view: View,
+  markName: string,
+  color: string | undefined,
+  colorValue: unknown,
+  seriesFields?: string[]
+): SceneNode[] =>
+  findSceneItems(view, 'line', markName).filter((item) =>
+    seriesFields?.length
+      ? item.datum && String(getSeriesKey(item.datum, seriesFields)) === String(colorValue)
+      : color === undefined || String(item.datum?.[color]) === String(colorValue)
+  );
+
 /** Finds a Line's rendered path by its field-backed series identity. */
 export const findFocusedLineSceneItem = (
   view: View,
@@ -92,12 +105,7 @@ export const findFocusedLineSceneItem = (
   color: string | undefined,
   colorValue: unknown,
   seriesFields?: string[]
-): SceneNode | undefined =>
-  findSceneItems(view, 'line', markName).find((item) =>
-    seriesFields?.length
-      ? item.datum && String(getSeriesKey(item.datum, seriesFields)) === String(colorValue)
-      : color === undefined || String(item.datum?.[color]) === String(colorValue)
-  );
+): SceneNode | undefined => findFocusedLineSceneItems(view, markName, color, colorValue, seriesFields)[0];
 
 /** Bounds are group-relative; walk up the mark's owning groups to make them view-relative. */
 const absoluteBounds = (item: SceneNode): Bounds | undefined => {
@@ -126,6 +134,27 @@ export const pageBoundsForItem = (view: View, container: HTMLElement, item: Scen
     x2: containerRect.left + originX + bounds.x2,
     y2: containerRect.top + originY + bounds.y2,
   };
+};
+
+export const getFocusedLineBounds = (
+  view: View,
+  container: HTMLElement,
+  markName: string,
+  color: string | undefined,
+  colorValue: unknown,
+  seriesFields?: string[]
+): Bounds | undefined => {
+  const bounds = findFocusedLineSceneItems(view, markName, color, colorValue, seriesFields).flatMap((item) => {
+    const itemBounds = pageBoundsForItem(view, container, item);
+    return itemBounds ? [itemBounds] : [];
+  });
+  if (!bounds.length) return undefined;
+  return bounds.reduce((combined, itemBounds) => ({
+    x1: Math.min(combined.x1, itemBounds.x1),
+    y1: Math.min(combined.y1, itemBounds.y1),
+    x2: Math.max(combined.x2, itemBounds.x2),
+    y2: Math.max(combined.y2, itemBounds.y2),
+  }));
 };
 
 export const hideFocusedItemTooltip = (view: View | undefined): void => {

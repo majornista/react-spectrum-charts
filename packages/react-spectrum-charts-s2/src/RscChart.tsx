@@ -181,12 +181,14 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
   const actionBars = useActionBars(sanitizedChildren);
   const popovers = usePopovers(sanitizedChildren);
 
+  const [navigationView, setNavigationView] = useState<VegaView>();
   const handleNewView = useCallback(
     (view: VegaView) => {
       onNewView(view);
+      if (accessibleNavigation) setNavigationView(view);
       onVegaViewReady?.(view);
     },
-    [onNewView, onVegaViewReady]
+    [onNewView, onVegaViewReady, accessibleNavigation]
   );
 
   const navContainerRef = useRef<HTMLDivElement>(null);
@@ -401,7 +403,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
           tooltip={inspectOptions} // legend show/hide relies on this
           onNewView={handleNewView}
         />
-        {accessibleNavigation && navChartType && (
+        {accessibleNavigation && navChartType && navigationView && (
           <Navigator
             chartType={navChartType}
             data={data as SimpleData[]}
@@ -431,6 +433,7 @@ export const RscChart = ({ ref, ...props }: RscChartProps & { ref?: Ref<ChartHan
             containerRef={navContainerRef}
             chartId={chartId}
             getView={getView}
+            view={navigationView}
             selectedData={selectedData}
             selectedDataBounds={selectedDataBounds}
             selectedDataName={selectedDataName}

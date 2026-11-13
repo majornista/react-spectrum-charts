@@ -11,10 +11,10 @@
  */
 import { Signal } from 'vega';
 
-import { FILTERED_TABLE, HOVERED_ITEM } from '@spectrum-charts/core-s2/constants';
+import { FILTERED_TABLE, HOVERED_ITEM, INTERACTION_MODALITY } from '@spectrum-charts/core-s2/constants';
 
 import { defaultSignals } from '../specTestUtils.js';
-import { addHoveredItemSignal, getHighlightSignalUpdateExpression } from './signalSpecBuilder.js';
+import { addHoveredItemSignal, addInteractionModalitySignal, getHighlightSignalUpdateExpression } from './signalSpecBuilder.js';
 
 describe('signalSpecBuilder', () => {
   let signals: Signal[];
@@ -36,6 +36,20 @@ describe('signalSpecBuilder', () => {
     test('should referende hiddenSeries if there are not keys', () => {
       const update = getHighlightSignalUpdateExpression('legend0', true, []);
       expect(update).toContain('hiddenSeries');
+    });
+  });
+
+  describe('addInteractionModalitySignal()', () => {
+    test('restores pointer modality on entry and movement without duplicating the shared signal', () => {
+      signals = [];
+      addInteractionModalitySignal(signals, 'line0_voronoi');
+      addInteractionModalitySignal(signals, 'line1_voronoi');
+      expect(signals).toHaveLength(1);
+      expect(signals[0]).toHaveProperty('name', INTERACTION_MODALITY);
+      expect(signals[0]?.on).toEqual([
+        { events: '@line0_voronoi:mouseover, @line0_voronoi:mousemove', update: "'pointer'" },
+        { events: '@line1_voronoi:mouseover, @line1_voronoi:mousemove', update: "'pointer'" },
+      ]);
     });
   });
 

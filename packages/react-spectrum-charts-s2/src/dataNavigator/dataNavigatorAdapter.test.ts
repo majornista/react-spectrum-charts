@@ -1469,6 +1469,32 @@ describe('attachDataNavigator()', () => {
       );
     });
 
+    test.each(['en-US', 'de-DE'])('preserves numeric dimension and series identifiers in %s tooltips', async (locale) => {
+      const rows = [{ year: 2024, series: 2023, value: 1234.56789, line0_rscNavIndex: 1, [SERIES_ID]: '2023' }];
+      (view.data as jest.Mock).mockReturnValue(rows);
+      (view.scale as jest.Mock).mockImplementation(() => (value: number) => value);
+      attachLine({
+        data: rows,
+        dimension: 'year',
+        color: 'series',
+        seriesFields: ['series'],
+        scaleType: 'linear',
+        isTimeDimension: false,
+        locale,
+        fieldLabels: { year: 'Year', series: 'Period', value: 'Users' },
+      });
+      entryButton().click();
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      fireEvent.keyDown(focused(), { key: 'Enter', code: 'Enter' });
+      await Promise.resolve();
+      expect(tooltipCallback).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        { Year: 2024, Period: 2023, Users: new Intl.NumberFormat(locale).format(1234.56789) }
+      );
+    });
+
     test('uses transformed time and forecast metric for overlay, tooltip and popover without replacing callback fields', async () => {
       const rows = [{
         datetime: 1500,

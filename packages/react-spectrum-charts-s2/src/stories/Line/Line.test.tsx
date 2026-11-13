@@ -14,7 +14,7 @@ import { View } from 'vega';
 
 import { Chart } from '../../Chart.js';
 import { Axis, Legend, Line, LineForecast, LinePointAnnotation } from '../../components/index.js';
-import { findAllMarksByGroupName, findChart, render, waitFor } from '../../test-utils/index.js';
+import { clickNthElement, findAllMarksByGroupName, findChart, getAllLegendEntries, render, waitFor } from '../../test-utils/index.js';
 import '../../test-utils/__mocks__/matchMedia.mock.js';
 import { Basic } from './Features/Line.story.js';
 import { LineType, Opacity } from './Features/Styling/LineStyling.story.js';
@@ -27,6 +27,59 @@ describe('LinePointAnnotation', () => {
 });
 
 describe('Line', () => {
+  test('rebuilds navigation against replacement views after hiding and showing a legend series', async () => {
+    const onVegaViewReady = jest.fn((view: View) => { jest.spyOn(view, 'addSignalListener'); });
+    render(
+      <Chart data={[
+        { datetime: 0, value: 10, series: 'A' },
+        { datetime: 1000, value: 20, series: 'A' },
+        { datetime: 0, value: 30, series: 'B' },
+        { datetime: 1000, value: 40, series: 'B' },
+      ]} accessibleNavigation animations={false} width={400} height={300} onVegaViewReady={onVegaViewReady}>
+        <Line color="series" />
+        <Legend keys={['series']} isToggleable />
+      </Chart>
+    );
+    const svg = await findChart();
+    const container = svg.closest('.rsc-container') as HTMLElement;
+    const latestView = () => onVegaViewReady.mock.calls.at(-1)?.[0];
+    await waitFor(() => {
+      expect(container.querySelector('.dn-entry-button')).toBeTruthy();
+      expect(latestView()?.addSignalListener).toHaveBeenCalledWith('hiddenSeries', expect.any(Function));
+    });
+    const enterChart = () => fireEvent.click(container.querySelector('.dn-entry-button') as HTMLElement);
+    const press = (key: string) => fireEvent.keyDown(document.activeElement as HTMLElement, { key, code: key });
+    const label = () => document.activeElement?.querySelector('.dn-node-text')?.getAttribute('aria-label');
+    const clickLegendA = async () => clickNthElement(getAllLegendEntries(await findChart()), 0);
+    enterChart();
+    press('Enter');
+    expect(label()).toContain('Line A');
+    const firstView = latestView();
+    await clickLegendA();
+    await waitFor(() => {
+      expect(latestView()).not.toBe(firstView);
+      expect(latestView()?.signal('hiddenSeries')).toEqual(['A']);
+      expect(latestView()?.addSignalListener).toHaveBeenCalledWith('hiddenSeries', expect.any(Function));
+    });
+    enterChart();
+    press('Enter');
+    expect(label()).toContain('Line B');
+    press('ArrowDown');
+    expect(label()).toContain('Line B');
+    const hiddenView = latestView();
+    await clickLegendA();
+    await waitFor(() => {
+      expect(latestView()).not.toBe(hiddenView);
+      expect(latestView()?.signal('hiddenSeries')).toEqual([]);
+      expect(latestView()?.addSignalListener).toHaveBeenCalledWith('hiddenSeries', expect.any(Function));
+    });
+    enterChart();
+    press('Enter');
+    expect(label()).toContain('Line A');
+    press('ArrowDown');
+    expect(label()).toContain('Line B');
+  });
+
   test('uses object-form time and number locales for keyboard navigation', async () => {
     const datetime = Date.UTC(2024, 2, 15);
     render(
@@ -77,7 +130,15 @@ describe('Line', () => {
     if (!view) throw new Error('Expected a rendered Vega view');
     fireEvent.click(container.querySelector('.dn-entry-button') as HTMLElement);
     const press = (key: string) => fireEvent.keyDown(document.activeElement as HTMLElement, { key, code: key });
+    const lineRight = view.origin()[0] + view.scale('xTime')(3000);
     press('Enter');
+    await waitFor(() => {
+      const overlay = document.activeElement as HTMLElement;
+      const left = Number.parseFloat(overlay.style.left);
+      const width = Number.parseFloat(overlay.style.width);
+      expect(left).toBeGreaterThan(0);
+      expect(left + width).toBeGreaterThanOrEqual(lineRight);
+    });
     press('Enter');
     press('ArrowRight');
     const [originX, originY] = view.origin();

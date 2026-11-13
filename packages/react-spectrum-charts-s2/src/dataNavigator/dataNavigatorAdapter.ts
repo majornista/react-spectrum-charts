@@ -59,7 +59,7 @@ import { FocusedItemFields, getFocusedItemBounds, getFocusedItemClientPosition }
 import {
   findFocusedBarSceneItem,
   findFocusedDimensionAreaSceneItem,
-  findFocusedLineSceneItem,
+  getFocusedLineBounds,
   hideFocusedItemTooltip,
   pageBoundsForItem,
   showAxisLabelTooltip,
@@ -242,10 +242,8 @@ const barNavStrategy: ChartNavStrategy = {
 
 const lineNavStrategy: ChartNavStrategy = {
   resolveDivisionBounds: (view, container, node, { markName, color, seriesFields }) => {
-    // A line's division represents the whole line — anchor to its own rendered path bounds, the same as a real click would (see markClickUtils.ts's getItemBounds).
     const colorValue = color ? (node.data as Record<string, unknown> | undefined)?.[color] : undefined;
-    const item = findFocusedLineSceneItem(view, markName, color, colorValue, seriesFields);
-    return item ? pageBoundsForItem(view, container, item) : undefined;
+    return getFocusedLineBounds(view, container, markName, color, colorValue, seriesFields);
   },
   resolveLeafBounds: (view, container, row, context) =>
     context.metric
@@ -425,11 +423,12 @@ const showTooltipForFocusedNode = (
     if (value && chartType === 'line' && !hasChartInspect) {
       const tooltipLocale = context.locale ?? 'en-US';
       const numberFormatter = new Intl.NumberFormat(context.numberLocale ?? tooltipLocale);
+      const metricLabel = metric === undefined ? undefined : fieldLabels[metric] ?? metric;
       value = Object.fromEntries(Object.entries(value).map(([field, fieldValue]) => {
         if (context.isTimeDimension && field === (fieldLabels[dimension] ?? dimension)) {
           return [field, formatDateValue(fieldValue, tooltipLocale)];
         }
-        return [field, typeof fieldValue === 'number' ? numberFormatter.format(fieldValue) : fieldValue];
+        return [field, field === metricLabel && typeof fieldValue === 'number' ? numberFormatter.format(fieldValue) : fieldValue];
       }));
     }
     chartNavStrategies[chartType].showLeafTooltip(container, view, row, value, {

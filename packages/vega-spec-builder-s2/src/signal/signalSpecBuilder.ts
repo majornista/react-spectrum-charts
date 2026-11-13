@@ -160,7 +160,7 @@ export const addInteractionModalitySignal = (signals: Signal[], targetName: stri
   }
   signal.on = signal.on ?? [];
   // No mouseout trigger: moving from one interactive mark to another must not reset modality.
-  signal.on.push({ events: `@${targetName}:mouseover`, update: "'pointer'" });
+  signal.on.push({ events: `@${targetName}:mouseover, @${targetName}:mousemove`, update: "'pointer'" });
 };
 
 export const addHoveredItemSignal = (

@@ -18,6 +18,7 @@ import {
   findFocusedBarSceneItem,
   findFocusedDimensionAreaSceneItem,
   findFocusedLineSceneItem,
+  getFocusedLineBounds,
   hideFocusedItemTooltip,
   showFocusedItemTooltip,
   showFocusedItemTooltipAtPosition,
@@ -188,6 +189,40 @@ describe('findFocusedDimensionAreaSceneItem()', () => {
     const view = mockDimensionAreaView([{ datum: { browser: 'Firefox' } }]);
 
     expect(findFocusedDimensionAreaSceneItem(view, MARK_NAME, 'browser', 'Chrome')).toBeUndefined();
+  });
+});
+
+describe('getFocusedLineBounds()', () => {
+  test.each([undefined, ['series', 'period']])('unions matching segment bounds in page coordinates (facets=%p)', (seriesFields) => {
+    const first = {
+      datum: { series: 'A', period: 'Current' },
+      bounds: { x1: 0, y1: 1, x2: 20, y2: 10 },
+      mark: { group: { x: 10, y: 30 } },
+    };
+    const second = {
+      datum: { series: 'A', period: 'Current' },
+      bounds: { x1: 5, y1: -5, x2: 25, y2: 15 },
+      mark: { group: { x: 50, y: 10, mark: { group: { x: 5, y: 2 } } } },
+    };
+    const unrelated = { datum: { series: 'B', period: 'Current' }, bounds: { x1: -999, y1: -999, x2: 999, y2: 999 } };
+    const view = {
+      scenegraph: () => ({ root: { items: [{ marktype: 'line', name: 'line0', items: [first, unrelated, second] }] } }),
+      origin: () => [3, 7],
+    } as unknown as View;
+    jest.spyOn(container, 'getBoundingClientRect').mockReturnValue({ left: 100, top: 200 } as DOMRect);
+    const colorValue = seriesFields ? 'A | Current' : 'A';
+    expect(getFocusedLineBounds(view, container, 'line0', 'series', colorValue, seriesFields))
+      .toEqual({ x1: 113, y1: 214, x2: 183, y2: 247 });
+    expect(getFocusedLineBounds(view, container, 'line0', 'series', 'Missing', seriesFields)).toBeUndefined();
+    expect(getFocusedLineBounds(view, container, 'line0', undefined, undefined))
+      .toEqual({ x1: -896, y1: -792, x2: 1102, y2: 1206 });
+  });
+
+  test('returns undefined when matching segments have no bounds', () => {
+    const view = {
+      scenegraph: () => ({ root: { items: [{ marktype: 'line', name: 'line0', items: [{ datum: { series: 'A' } }] }] } }),
+    } as unknown as View;
+    expect(getFocusedLineBounds(view, container, 'line0', 'series', 'A')).toBeUndefined();
   });
 });
 
