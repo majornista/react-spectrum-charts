@@ -12,6 +12,7 @@
 import { Edges, NavigationRules, NodeObject, Nodes, Structure } from 'data-navigator';
 
 import {
+  DEFAULT_METRIC,
   DEFAULT_TIME_DIMENSION,
   NAVIGATION_INDEX_FIELD,
   SERIES_ID,
@@ -40,6 +41,10 @@ export interface BuildLineStructureOptions {
   title?: string;
   /** BCP-47 locale for the accessible strings (from the surrounding app). Defaults to en-US. */
   locale?: string;
+  /** BCP-47 locale for numeric metric labels. Defaults to locale. */
+  numberLocale?: string;
+  /** Primary metric / y-axis field. */
+  metric?: string;
   /** Maps a data field name to its display label (axis/legend title), so labels read as the chart's titles rather than raw field keys. */
   fieldLabels?: Record<string, string>;
 }
@@ -110,6 +115,8 @@ export const buildLineStructure = ({
   isTimeDimension = true,
   title,
   locale = DEFAULT_DATA_NAVIGATOR_LOCALE,
+  numberLocale = locale,
+  metric = DEFAULT_METRIC,
   fieldLabels = {},
 }: BuildLineStructureOptions): LineStructure => {
   const lines = groupIntoLines(data, seriesField);
@@ -186,7 +193,9 @@ export const buildLineStructure = ({
 
   const structure: Structure = { nodes, edges, navigationRules: lineNavigationRules };
 
-  applyDefaultLabels(structure, (node) => buildNodeLabel(node, dimension, isTimeDimension, locale, fieldLabels));
+  applyDefaultLabels(structure, (node) =>
+    buildNodeLabel(node, dimension, isTimeDimension, locale, fieldLabels, metric, numberLocale)
+  );
 
   return { structure, entryPoint: CHART_ROOT_ID };
 };
@@ -236,7 +245,9 @@ export const buildNodeLabel = (
   dimension: string,
   isTimeDimension: boolean,
   locale: string = DEFAULT_DATA_NAVIGATOR_LOCALE,
-  fieldLabels: Record<string, string> = {}
+  fieldLabels: Record<string, string> = {},
+  metric: string = DEFAULT_METRIC,
+  numberLocale: string = locale
 ): string => {
   const data = node.data as Record<string, unknown> | undefined;
   if (!data) return String(node.id);
@@ -263,7 +274,10 @@ export const buildNodeLabel = (
     )
     .map(([key, value]) => {
       const label = fieldLabels[key] ?? key;
-      const displayValue = key === dimension && isTimeDimension ? formatDateValue(value, locale) : value;
+      const formattedValue = key === metric && typeof value === 'number'
+        ? new Intl.NumberFormat(numberLocale).format(value)
+        : value;
+      const displayValue = key === dimension && isTimeDimension ? formatDateValue(value, locale) : formattedValue;
       return `${label}: ${displayValue}`;
     });
   return parts.length > 0 ? `${parts.join('. ')}.` : String(node.id);

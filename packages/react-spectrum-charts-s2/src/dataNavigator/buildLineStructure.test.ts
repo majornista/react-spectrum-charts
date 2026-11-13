@@ -123,6 +123,26 @@ describe('buildLineStructure()', () => {
     expect(structure.nodes['1'].semantics?.label).toContain('15.03.2024');
   });
 
+  test.each([
+    { locale: undefined, numberLocale: undefined, expected: '1,234.568' },
+    { locale: 'de-DE', numberLocale: undefined, expected: '1.234,568' },
+    { locale: 'de-DE', numberLocale: 'en-US', expected: '1,234.568' },
+    { locale: 'en-US', numberLocale: 'de-DE', expected: '1.234,568' },
+  ])('formats only the metric with locale $locale and numberLocale $numberLocale', ({ locale, numberLocale, expected }) => {
+    const { structure } = buildLineStructure({
+      data: [{ year: 2024, series: 2023, downloads: 1234.56789, identifier: 9999 }],
+      dimension: 'year',
+      metric: 'downloads',
+      isTimeDimension: false,
+      locale,
+      numberLocale,
+      fieldLabels: { year: 'Year', series: 'Period', downloads: 'Downloads' },
+    });
+    expect(structure.nodes['1'].semantics?.label).toBe(
+      `Year: 2024. Period: 2023. Downloads: ${expected}. identifier: 9999.`
+    );
+  });
+
   describe('keyboard navigation (single line)', () => {
     test('drilling in from the chart root reaches the line, then its first point', () => {
       const { structure, entryPoint } = buildLineStructure({ data, dimension: 'datetime', isTimeDimension: false });

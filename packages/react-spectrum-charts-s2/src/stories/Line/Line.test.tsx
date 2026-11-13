@@ -96,6 +96,7 @@ describe('Line', () => {
     fireEvent.keyDown(document.activeElement as HTMLElement, { key: 'Enter', code: 'Enter' });
     const formattedDate = new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium' }).format(new Date(datetime));
     expect(document.activeElement?.querySelector('.dn-node-text')?.getAttribute('aria-label')).toContain(formattedDate);
+    expect(document.activeElement?.querySelector('.dn-node-text')?.getAttribute('aria-label')).toContain('1,234.5');
     await waitFor(() => {
       const tooltip = document.getElementById('vg-tooltip-element');
       expect(tooltip?.textContent).toContain(formattedDate);

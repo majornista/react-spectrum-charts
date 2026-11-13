@@ -629,6 +629,7 @@ export const attachDataNavigator = ({
     type,
     colorOverride,
     locale,
+    numberLocale,
     metric,
     order,
     orientation,

@@ -54,6 +54,8 @@ export interface ChartStructureOptions {
   colorOverride?: string;
   /** Locale used for accessible color names. */
   locale?: string;
+  /** BCP-47 locale for numeric Line metric labels. Defaults to locale. */
+  numberLocale?: string;
   /** Primary metric / y-axis field. */
   metric?: string;
   /** The stack sort field. When set on a stacked bar, determines which segment is reached first, mirroring Vega's own stack sort. */
